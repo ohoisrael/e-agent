@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from "react";
+import React, { createContext, useContext, ReactNode, useMemo } from "react";
 
 import { getCurrentUser } from "./appwrite";
 import { useAppwrite } from "./useAppwrite";
@@ -36,15 +36,16 @@ export const GlobalProvider = ({ children }: GlobalProviderProps) => {
 
   const isLogged = !!user;
 
+  // Memoize the context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
+    isLogged,
+    user,
+    loading,
+    refetch,
+  }), [isLogged, user, loading, refetch]);
+
   return (
-    <GlobalContext.Provider
-      value={{
-        isLogged,
-        user,
-        loading,
-        refetch,
-      }}
-    >
+    <GlobalContext.Provider value={value}>
       {children}
     </GlobalContext.Provider>
   );

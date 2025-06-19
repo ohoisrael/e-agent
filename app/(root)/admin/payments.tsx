@@ -33,7 +33,7 @@ const AdminPayments = () => {
 
   const { data: payments, loading } = useAppwrite({
     fn: getPayments,
-    params: {}, // No userId for admin view
+    params: user.role === "admin" ? {} : { userId: user.$id },
   });
 
   useEffect(() => {

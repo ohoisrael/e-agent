@@ -33,7 +33,7 @@ const AdminBookings = () => {
 
   const { data: bookings, loading } = useAppwrite({
     fn: getBookings,
-    params: {}, // No userId for admin view
+    params: user.role === "admin" ? {} : { userId: user.$id },
   });
 
   useEffect(() => {

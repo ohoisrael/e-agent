@@ -346,7 +346,7 @@ export async function createProperty(data: {
   geolocation: string;
   status: string;
   phone?: string;
-}) {
+}, refetchCallback?: () => void) { // Add optional refetch callback
   try {
     const property = await databases.createDocument(
       config.databaseId!,
@@ -371,6 +371,7 @@ export async function createProperty(data: {
         phone: data.phone || null,
       }
     );
+    if (refetchCallback) refetchCallback(); // Trigger refetch after creation
     return property;
   } catch (error: any) {
     console.error("Create property failed:", error);
@@ -509,19 +510,19 @@ export async function createBooking(data: {
   }
 }
 
-export async function getBookings(userId?: string) {
+export async function getBookings({ userId }: { userId?: string }) {
   try {
-    const queries = [Query.orderDesc("$createdAt")];
+    const buildQuery = [Query.orderDesc("$createdAt")];
     if (userId && typeof userId === "string" && userId.trim() !== "") {
       console.log("Fetching bookings for userId:", userId);
-      queries.push(Query.equal("userId", userId));
+      buildQuery.push(Query.equal("userId", userId));
     } else {
-      console.log("No userId provided, fetching all bookings");
+      console.log("Fetching all bookings for admin view");
     }
     const result = await databases.listDocuments(
       config.databaseId!,
       config.bookingsCollectionId!,
-      queries
+      buildQuery
     );
     console.log("Bookings fetched:", result.documents);
     return result.documents;
@@ -552,19 +553,19 @@ export async function createPayment(data: {
   }
 }
 
-export async function getPayments(userId?: string) {
+export async function getPayments({ userId }: { userId?: string }) {
   try {
-    const queries = [Query.orderDesc("$createdAt")];
+    const buildQuery = [Query.orderDesc("$createdAt")];
     if (userId && typeof userId === "string" && userId.trim() !== "") {
       console.log("Fetching payments for userId:", userId);
-      queries.push(Query.equal("userId", userId));
+      buildQuery.push(Query.equal("userId", userId));
     } else {
-      console.log("No userId provided, fetching all payments");
+      console.log("Fetching all payments for admin view");
     }
     const result = await databases.listDocuments(
       config.databaseId!,
       config.paymentsCollectionId!,
-      queries
+      buildQuery
     );
     console.log("Payments fetched:", result.documents);
     return result.documents;

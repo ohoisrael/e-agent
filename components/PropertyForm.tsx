@@ -42,7 +42,7 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
   });
   const [uploading, setUploading] = useState(false);
   const [types] = useState<string[]>(["House", "SingleRoom", "Apartment", "Chamber&Hall"]); // Hardcoded types
-  const [facilitiesList] = useState<string[]>(["Wifi", "Laundry", "Gym", "Parking"]); // Hardcoded facilities
+  const [facilitiesList] = useState<string[]>(["Wifi", "Laudry", "Gym", "Parking"]); // Hardcoded facilities
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>(property?.facilities || []);
   const [isTypeModalVisible, setIsTypeModalVisible] = useState(false); // For custom dropdown
   const inputRefs = {
