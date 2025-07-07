@@ -2,7 +2,13 @@ import { View } from "react-native";
 import { useState } from "react";
 import { Picker } from "@react-native-picker/picker";
 
-export default function Filters({ selectedFilter, onFilterChange }: { selectedFilter: string; onFilterChange: (filter: string) => void }) {
+export default function Filters({
+  selectedFilter,
+  onFilterChange,
+}: {
+  selectedFilter: string;
+  onFilterChange: (filter: string) => void;
+}) {
   const [filter, setFilter] = useState(selectedFilter);
 
   const handleFilterChange = (value: string) => {

@@ -14,7 +14,9 @@ export const config = {
   paymentsCollectionId: "payments",
 };
 
-const client = new Client().setEndpoint(config.endpoint).setProject("propertyApp");
+const client = new Client()
+  .setEndpoint(config.endpoint)
+  .setProject("propertyApp");
 const databases = new Databases(client);
 const socket = io(config.socketEndpoint, {
   transports: ["websocket"],
@@ -44,7 +46,13 @@ export async function getCurrentUser() {
   }
 }
 
-export async function login({ email, password }: { email: string; password: string }) {
+export async function login({
+  email,
+  password,
+}: {
+  email: string;
+  password: string;
+}) {
   try {
     const response = await fetch(`${config.endpoint}/auth/login`, {
       method: "POST",
@@ -84,7 +92,15 @@ export async function loginWithPhone(phone: string) {
   }
 }
 
-export async function register({ email, password, name }: { email: string; password: string; name: string }) {
+export async function register({
+  email,
+  password,
+  name,
+}: {
+  email: string;
+  password: string;
+  name: string;
+}) {
   try {
     const response = await fetch(`${config.endpoint}/auth/register`, {
       method: "POST",
@@ -104,7 +120,13 @@ export async function register({ email, password, name }: { email: string; passw
   }
 }
 
-export async function registerWithPhone({ phone, name }: { phone: string; name: string }) {
+export async function registerWithPhone({
+  phone,
+  name,
+}: {
+  phone: string;
+  name: string;
+}) {
   try {
     const response = await fetch(`${config.endpoint}/auth/register/phone`, {
       method: "POST",
@@ -145,7 +167,11 @@ export async function getLatestProperties() {
     const response = await fetch(`${config.endpoint}/property/latest`);
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("getLatestProperties - HTTP error:", response.status, errorText);
+      console.error(
+        "getLatestProperties - HTTP error:",
+        response.status,
+        errorText
+      );
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const properties = await response.json();
@@ -157,7 +183,15 @@ export async function getLatestProperties() {
   }
 }
 
-export async function getProperties({ filter, query, limit }: { filter?: string; query?: string; limit?: number }) {
+export async function getProperties({
+  filter,
+  query,
+  limit,
+}: {
+  filter?: string;
+  query?: string;
+  limit?: number;
+}) {
   try {
     const url = new URL(`${config.endpoint}/property`);
     url.searchParams.append("filter", filter || "All");
@@ -193,11 +227,15 @@ export async function getPropertyById({ id }: { id: string }) {
     const response = await fetch(`${config.endpoint}/property/${id}`);
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("getPropertyById - HTTP error:", response.status, errorText);
+      console.error(
+        "getPropertyById - HTTP error:",
+        response.status,
+        errorText
+      );
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const property = await response.json();
-    
+
     return property;
   } catch (error) {
     console.error("Failed to fetch property:", error);
@@ -205,7 +243,10 @@ export async function getPropertyById({ id }: { id: string }) {
   }
 }
 
-export async function createProperty(data: any, triggerPropertyRefresh: () => void) {
+export async function createProperty(
+  data: any,
+  triggerPropertyRefresh: () => void
+) {
   try {
     const formData = new FormData();
     Object.keys(data).forEach((key) => {
@@ -223,7 +264,10 @@ export async function createProperty(data: any, triggerPropertyRefresh: () => vo
         formData.append(key, data[key]);
       }
     });
-    console.log("createProperty: FormData being sent:", Object.fromEntries(formData));
+    console.log(
+      "createProperty: FormData being sent:",
+      Object.fromEntries(formData)
+    );
     const response = await fetch(`${config.endpoint}/property/add`, {
       method: "POST",
       body: formData,
@@ -262,7 +306,10 @@ export async function updateProperty(propertyId: string, data: any) {
         formData.append(key, data[key]);
       }
     });
-    console.log("FormData being sent for update:", Object.fromEntries(formData));
+    console.log(
+      "FormData being sent for update:",
+      Object.fromEntries(formData)
+    );
     const response = await fetch(`${config.endpoint}/property/${propertyId}`, {
       method: "PUT",
       body: formData,
@@ -281,16 +328,24 @@ export async function updateProperty(propertyId: string, data: any) {
   }
 }
 
-export async function createBooking({ userId, propertyId, status }: { userId: string; propertyId: string; status: string }) {
+export async function createBooking({
+  userId,
+  propertyId,
+  status,
+}: {
+  userId: string;
+  propertyId: string;
+  status: string;
+}) {
   try {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
     router.push("/sign-in");
     const response = await fetch(`${config.endpoint}/booking`, {
       method: "POST",
-      headers: { 
-        "Content-Type": "application/json", 
-        Authorization: `Bearer ${token}` 
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ userId, propertyId, status }),
     });
@@ -312,26 +367,29 @@ export async function getBookings({ userId }: { userId?: string }) {
   try {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
-    
+
     const user = await getCurrentUser();
     if (!user) throw new Error("User not found");
-    
+
     // Always use the current user's ID unless specifically requesting another user's bookings (admin)
     const effectiveUserId = userId || user._id || user.$id;
-    const endpoint = user?.role === 'admin' && !userId 
-      ? '/booking/admin' 
-      : `/booking/user/${effectiveUserId}`;
+    const endpoint =
+      user?.role === "admin" && !userId
+        ? "/booking/admin"
+        : `/booking/user/${effectiveUserId}`;
 
     const response = await fetch(`${config.endpoint}${endpoint}`, {
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}` 
+        Authorization: `Bearer ${token}`,
       },
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      throw new Error(
+        `HTTP error! status: ${response.status}, message: ${errorText}`
+      );
     }
     return await response.json();
   } catch (error) {
@@ -345,17 +403,24 @@ export async function getPayments({ userId }: { userId?: string }) {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
     const user = await getCurrentUser(); // Assuming getCurrentUser is implemented
-    const endpoint = user?.role === 'admin' ? '/payment/admin' : userId ? `/payment/user/${userId}` : `/payment/user/${user?._id || user?.$id}`;
+    const endpoint =
+      user?.role === "admin"
+        ? "/payment/admin"
+        : userId
+        ? `/payment/user/${userId}`
+        : `/payment/user/${user?._id || user?.$id}`;
     const response = await fetch(`${config.endpoint}${endpoint}`, {
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}` 
+        Authorization: `Bearer ${token}`,
       },
     });
     if (!response.ok) {
       const errorText = await response.text();
       console.error("getPayments - HTTP error:", response.status, errorText);
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      throw new Error(
+        `HTTP error! status: ${response.status}, message: ${errorText}`
+      );
     }
     const payments = await response.json();
     console.log("getPayments - Response:", payments);
@@ -366,7 +431,13 @@ export async function getPayments({ userId }: { userId?: string }) {
   }
 }
 
-export async function createPayment(data: { userId: string; propertyId: string; amount: number; paystackRef?: string; status?: string }) {
+export async function createPayment(data: {
+  userId: string;
+  propertyId: string;
+  amount: number;
+  paystackRef?: string;
+  status?: string;
+}) {
   try {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
@@ -374,21 +445,26 @@ export async function createPayment(data: { userId: string; propertyId: string; 
     console.log("Token used for payment:", token);
     const response = await fetch(`${config.endpoint}/payment/initialize`, {
       method: "POST",
-      headers: { 
-        "Content-Type": "application/json", 
-        Authorization: `Bearer ${token}` 
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ ...data, amount: Math.round(data.amount) }),
     });
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Payment initialization failed - Raw response:", errorText);
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      throw new Error(
+        `HTTP error! status: ${response.status}, message: ${errorText}`
+      );
     }
     const result = await response.json();
     console.log("Payment initialization response:", result);
     if (result.authorization_url) {
-      const redirectResult = await WebBrowser.openAuthSessionAsync(result.authorization_url, `${config.endpoint}/payment/verify/${result.reference}`);
+      const redirectResult = await WebBrowser.openAuthSessionAsync(
+        result.authorization_url,
+        `${config.endpoint}/payment/verify/${result.reference}`
+      );
       console.log("Redirect Result in createPayment:", redirectResult);
       if (redirectResult.type === "success") {
         const verification = await verifyPayment(result.reference);
@@ -396,7 +472,10 @@ export async function createPayment(data: { userId: string; propertyId: string; 
         return verification;
       } else if (redirectResult.type === "cancel") {
         const verification = await verifyPayment(result.reference);
-        console.log("Cancellation Verification in createPayment:", verification);
+        console.log(
+          "Cancellation Verification in createPayment:",
+          verification
+        );
         return verification;
       } else {
         throw new Error("Redirect process interrupted");
@@ -414,17 +493,22 @@ export async function verifyPayment(reference: string) {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
     console.log("Token used for verification:", token);
-    const response = await fetch(`${config.endpoint}/payment/verify/${reference}`, {
-      method: "GET",
-      headers: { 
-        "Content-Type": "application/json", 
-        Authorization: `Bearer ${token}` 
-      },
-    });
+    const response = await fetch(
+      `${config.endpoint}/payment/verify/${reference}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Payment verification failed - Raw response:", errorText);
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      throw new Error(
+        `HTTP error! status: ${response.status}, message: ${errorText}`
+      );
     }
     const result = await response.json();
     console.log("Payment verification response:", result);
@@ -442,17 +526,24 @@ export async function updatePropertyStatus(propertyId: string, status: string) {
   try {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
-    const response = await fetch(`${config.endpoint}/property/${propertyId}/status`, {
-      method: "PUT",
-      headers: { 
-        "Content-Type": "application/json", 
-        Authorization: `Bearer ${token}` 
-      },
-      body: JSON.stringify({ status }),
-    });
+    const response = await fetch(
+      `${config.endpoint}/property/${propertyId}/status`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      }
+    );
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("updatePropertyStatus - HTTP error:", response.status, errorText);
+      console.error(
+        "updatePropertyStatus - HTTP error:",
+        response.status,
+        errorText
+      );
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const result = await response.json();
@@ -478,7 +569,15 @@ export function useChatSocket() {
   return socket;
 }
 
-export async function startChat({ userId, adminId, userName }: { userId: string; adminId: string; userName: string }) {
+export async function startChat({
+  userId,
+  adminId,
+  userName,
+}: {
+  userId: string;
+  adminId: string;
+  userName: string;
+}) {
   try {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
@@ -504,7 +603,15 @@ export async function startChat({ userId, adminId, userName }: { userId: string;
   }
 }
 
-export async function sendMessage({ chatId, content, senderName }: { chatId: string; content: string; senderName: string }) {
+export async function sendMessage({
+  chatId,
+  content,
+  senderName,
+}: {
+  chatId: string;
+  content: string;
+  senderName: string;
+}) {
   try {
     console.log("Sending message to server:", { chatId, content, senderName });
     const token = await AsyncStorage.getItem("token");
@@ -515,7 +622,11 @@ export async function sendMessage({ chatId, content, senderName }: { chatId: str
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ chatId, content, senderName: senderName || "User" }),
+      body: JSON.stringify({
+        chatId,
+        content,
+        senderName: senderName || "User",
+      }),
     });
     if (!response.ok) {
       const errorText = await response.text();

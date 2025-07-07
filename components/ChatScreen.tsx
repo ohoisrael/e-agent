@@ -61,18 +61,27 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
     if (!user || !user._id || activeChatId || initializedRef.current) return;
 
     if (!user.name) {
-      Alert.alert("Error", "Your profile is missing a name. Please update your profile to start a chat.", [
-        { text: "OK", onPress: () => router.push("/profile") },
-      ]);
+      Alert.alert(
+        "Error",
+        "Your profile is missing a name. Please update your profile to start a chat.",
+        [{ text: "OK", onPress: () => router.push("/profile") }]
+      );
       return;
     }
 
     try {
       setLoading(true);
       initializedRef.current = true;
-      const response = await startChat({ userId: user._id, adminId: "admin", userName: user.name });
+      const response = await startChat({
+        userId: user._id,
+        adminId: "admin",
+        userName: user.name,
+      });
       const chatIdFromResponse = response.chatId;
-      if (chatIdFromResponse && chatIdFromResponse !== lastActiveChatIdRef.current) {
+      if (
+        chatIdFromResponse &&
+        chatIdFromResponse !== lastActiveChatIdRef.current
+      ) {
         setActiveChatId(chatIdFromResponse);
         lastActiveChatIdRef.current = chatIdFromResponse;
         socket.emit("joinChat", {
@@ -98,10 +107,17 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
       const filteredChats = chats.filter(
         (chat: Chat) => chat.userId !== user._id && chat.userName !== "Admin"
       );
-      if (JSON.stringify(filteredChats) !== JSON.stringify(lastAdminChatsRef.current)) {
+      if (
+        JSON.stringify(filteredChats) !==
+        JSON.stringify(lastAdminChatsRef.current)
+      ) {
         setAdminChats(filteredChats);
         lastAdminChatsRef.current = filteredChats;
-        if (filteredChats.length > 0 && !activeChatId && filteredChats[0]._id !== lastActiveChatIdRef.current) {
+        if (
+          filteredChats.length > 0 &&
+          !activeChatId &&
+          filteredChats[0]._id !== lastActiveChatIdRef.current
+        ) {
           setSelectedChat(filteredChats[0]);
           setActiveChatId(filteredChats[0]._id);
           lastActiveChatIdRef.current = filteredChats[0]._id;
@@ -126,7 +142,8 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
       setLoading(true);
       const chat = await getMessages(chatId);
       const sortedMessages = (chat.messages || []).sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
       setMessages(sortedMessages);
       previousChatIdRef.current = chatId;
@@ -172,20 +189,32 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
   }, [user, activeChatId, socket, fetchMessages]);
 
   useEffect(() => {
-    const handleChatHistory = (history: { messages: Message[]; chatId: string }) => {
+    const handleChatHistory = (history: {
+      messages: Message[];
+      chatId: string;
+    }) => {
       if (history.chatId !== activeChatId) return;
       const sortedMessages = (history.messages || []).sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
       setMessages(sortedMessages);
     };
 
     const handleNewMessage = (newMessage: Message) => {
-      if (newMessage._id === lastMessageIdRef.current || newMessage.chatId !== activeChatId) return;
+      if (
+        newMessage._id === lastMessageIdRef.current ||
+        newMessage.chatId !== activeChatId
+      )
+        return;
       lastMessageIdRef.current = newMessage._id;
       setMessages((prev) => {
-        const updated = [...prev.filter(msg => msg._id !== `temp-${newMessage._id}`), newMessage].sort(
-          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        const updated = [
+          ...prev.filter((msg) => msg._id !== `temp-${newMessage._id}`),
+          newMessage,
+        ].sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
         );
         return updated;
       });
@@ -193,7 +222,10 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
 
     const handleNotification = (data: { chatId: string; senderId: string }) => {
       if (data.chatId !== activeChatId && user) {
-        Alert.alert("New Message", `New message from ${data.senderId === user._id ? "Admin" : "User"}`);
+        Alert.alert(
+          "New Message",
+          `New message from ${data.senderId === user._id ? "Admin" : "User"}`
+        );
       }
     };
 
@@ -211,7 +243,9 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
   const handleSend = useCallback(async () => {
     if (!message.trim() || !activeChatId) return;
 
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const tempId = `temp-${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 9)}`;
     const newMessage = {
       _id: tempId,
       senderId: user._id,
@@ -220,11 +254,18 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
       timestamp: new Date().toISOString(),
       chatId: activeChatId,
     };
-    setMessages((prev) => [...prev, newMessage].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    ));
+    setMessages((prev) =>
+      [...prev, newMessage].sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )
+    );
     try {
-      await sendMessage({ chatId: activeChatId, content: message, senderName: user.name || "User" });
+      await sendMessage({
+        chatId: activeChatId,
+        content: message,
+        senderName: user.name || "User",
+      });
       setMessage("");
     } catch (error) {
       console.error("Send message error:", error);
@@ -233,19 +274,22 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
     }
   }, [message, activeChatId, user]);
 
-  const handleSelectChat = useCallback((chat: Chat) => {
-    if (chat._id === activeChatId) return;
-    setSelectedChat(chat);
-    setActiveChatId(chat._id);
-    lastActiveChatIdRef.current = chat._id;
-    socket.emit("joinChat", {
-      userId: user._id,
-      adminId: "admin",
-      chatId: chat._id,
-      userName: chat.userName,
-    });
-    fetchMessages(chat._id);
-  }, [user, socket, activeChatId, fetchMessages]);
+  const handleSelectChat = useCallback(
+    (chat: Chat) => {
+      if (chat._id === activeChatId) return;
+      setSelectedChat(chat);
+      setActiveChatId(chat._id);
+      lastActiveChatIdRef.current = chat._id;
+      socket.emit("joinChat", {
+        userId: user._id,
+        adminId: "admin",
+        chatId: chat._id,
+        userName: chat.userName,
+      });
+      fetchMessages(chat._id);
+    },
+    [user, socket, activeChatId, fetchMessages]
+  );
 
   const renderMessage = useCallback(
     ({ item }: { item: Message }) => {
@@ -258,13 +302,25 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
             isUserSender ? "self-end bg-primary-300" : "self-start bg-gray-100"
           }`}
         >
-          <Text className={`text-sm font-rubik-bold ${isUserSender ? "text-white" : "text-black-300"}`}>
+          <Text
+            className={`text-sm font-rubik-bold ${
+              isUserSender ? "text-white" : "text-black-300"
+            }`}
+          >
             {senderName}
           </Text>
-          <Text className={`text-base ${isUserSender ? "text-white" : "text-black-300"} font-rubik mt-1`}>
+          <Text
+            className={`text-base ${
+              isUserSender ? "text-white" : "text-black-300"
+            } font-rubik mt-1`}
+          >
             {item.content}
           </Text>
-          <Text className={`text-xs ${isUserSender ? "text-white/70" : "text-gray-500"} mt-1`}>
+          <Text
+            className={`text-xs ${
+              isUserSender ? "text-white/70" : "text-gray-500"
+            } mt-1`}
+          >
             {new Date(item.timestamp).toLocaleTimeString()}
           </Text>
         </View>
@@ -276,25 +332,41 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
   const renderAdminChatSelector = useMemo(
     () => (
       <View className="p-4 bg-white border-b border-gray-200">
-        <Text className="text-lg font-rubik-bold text-black-300 mb-2">Select User Chat</Text>
+        <Text className="text-lg font-rubik-bold text-black-300 mb-2">
+          Select User Chat
+        </Text>
         <FlatList
           horizontal
           data={adminChats}
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => {
-            const latestMessage = item.messages.length > 0
-              ? item.messages[item.messages.length - 1].content.slice(0, 30) + (item.messages[item.messages.length - 1].content.length > 30 ? "..." : "")
-              : "No messages yet";
+            const latestMessage =
+              item.messages.length > 0
+                ? item.messages[item.messages.length - 1].content.slice(0, 30) +
+                  (item.messages[item.messages.length - 1].content.length > 30
+                    ? "..."
+                    : "")
+                : "No messages yet";
             return (
               <TouchableOpacity
                 onPress={() => handleSelectChat(item)}
-                className={`p-3 mx-1 rounded-lg w-40 ${activeChatId === item._id ? "bg-primary-300" : "bg-gray-100"}`}
+                className={`p-3 mx-1 rounded-lg w-40 ${
+                  activeChatId === item._id ? "bg-primary-300" : "bg-gray-100"
+                }`}
               >
-                <Text className={`text-sm font-rubik-bold ${activeChatId === item._id ? "text-white" : "text-black-300"}`}>
+                <Text
+                  className={`text-sm font-rubik-bold ${
+                    activeChatId === item._id ? "text-white" : "text-black-300"
+                  }`}
+                >
                   {item.userName || "User"}
                 </Text>
                 <Text
-                  className={`text-xs font-rubik ${activeChatId === item._id ? "text-white/80" : "text-gray-500"} mt-1`}
+                  className={`text-xs font-rubik ${
+                    activeChatId === item._id
+                      ? "text-white/80"
+                      : "text-gray-500"
+                  } mt-1`}
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
@@ -325,13 +397,17 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
           <Image source={icons.backArrow} className="size-6" />
         </TouchableOpacity>
         <Text className="text-lg font-rubik-bold text-black-300">
-          {user?.role === "admin" ? `Chat with ${selectedChat?.userName || "User"}` : "Chat with Admin"}
+          {user?.role === "admin"
+            ? `Chat with ${selectedChat?.userName || "User"}`
+            : "Chat with Admin"}
         </Text>
         <TouchableOpacity className="p-2">
           <Image source={icons.info} className="size-6" tintColor="#666876" />
         </TouchableOpacity>
       </View>
-      {user?.role === "admin" && adminChats.length > 0 && renderAdminChatSelector}
+      {user?.role === "admin" &&
+        adminChats.length > 0 &&
+        renderAdminChatSelector}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
@@ -340,7 +416,9 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
         <FlatList
           ref={flatListRef}
           data={messages}
-          keyExtractor={(item) => item._id || `${item.senderId}-${item.timestamp}`}
+          keyExtractor={(item) =>
+            item._id || `${item.senderId}-${item.timestamp}`
+          }
           renderItem={renderMessage}
           inverted
           contentContainerStyle={{ padding: 10, paddingBottom: 20 }}
@@ -355,7 +433,9 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
           />
           <TouchableOpacity
             onPress={handleSend}
-            className={`p-3 rounded-lg ${message.trim() ? "bg-primary-300" : "bg-gray-300"}`}
+            className={`p-3 rounded-lg ${
+              message.trim() ? "bg-primary-300" : "bg-gray-300"
+            }`}
             disabled={!message.trim()}
           >
             <Image source={icons.send} className="size-6" tintColor="#FFFFFF" />

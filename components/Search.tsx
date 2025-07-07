@@ -1,7 +1,13 @@
 import { View, TextInput } from "react-native";
 import { useState } from "react";
 
-export default function Search({ query, onSearchChange }: { query: string; onSearchChange: (query: string) => void }) {
+export default function Search({
+  query,
+  onSearchChange,
+}: {
+  query: string;
+  onSearchChange: (query: string) => void;
+}) {
   const [searchQuery, setSearchQuery] = useState(query);
 
   const handleSearchChange = (value: string) => {

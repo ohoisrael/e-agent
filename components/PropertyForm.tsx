@@ -24,7 +24,11 @@ interface PropertyFormProps {
   isUpdate?: boolean;
 }
 
-const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps) => {
+const PropertyForm = ({
+  onClose,
+  property,
+  isUpdate = false,
+}: PropertyFormProps) => {
   const { user, triggerPropertyRefresh } = useGlobalContext(); // Add triggerPropertyRefresh
   const [form, setForm] = useState({
     name: property?.name || "",
@@ -37,18 +41,31 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
     description: property?.description || "",
     facilities: property?.facilities?.join(", ") || "",
     geolocation: property?.geolocation || "5.6082,-0.2528", // default
-    images: property?.images?.map((img: string) => ({
-      uri: img,
-      name: `property_${Date.now()}.jpg`,
-      type: "image/jpeg",
-    })) || [],
+    images:
+      property?.images?.map((img: string) => ({
+        uri: img,
+        name: `property_${Date.now()}.jpg`,
+        type: "image/jpeg",
+      })) || [],
     phone: property?.phone || "",
   });
 
   const [uploading, setUploading] = useState(false);
-  const [types] = useState<string[]>(["House", "SingleRoom", "Apartment", "Chamber&Hall"]);
-  const [facilitiesList] = useState<string[]>(["Wifi", "Laundry", "Gym", "Parking"]);
-  const [selectedFacilities, setSelectedFacilities] = useState<string[]>(property?.facilities || []);
+  const [types] = useState<string[]>([
+    "House",
+    "SingleRoom",
+    "Apartment",
+    "Chamber&Hall",
+  ]);
+  const [facilitiesList] = useState<string[]>([
+    "Wifi",
+    "Laundry",
+    "Gym",
+    "Parking",
+  ]);
+  const [selectedFacilities, setSelectedFacilities] = useState<string[]>(
+    property?.facilities || []
+  );
   const [isTypeModalVisible, setIsTypeModalVisible] = useState(false);
 
   const inputRefs = {
@@ -62,7 +79,8 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
   };
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
       Alert.alert("Permission Denied", "Please allow access to photos.");
       return;
@@ -79,7 +97,9 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
       const newImages = result.assets.map((asset) => {
         const extension = asset.uri.split(".").pop()?.toLowerCase();
         const mimeType = extension === "png" ? "image/png" : "image/jpeg";
-        const fileName = `property_${Date.now()}_${asset.uri.split("/").pop()}.${extension}`;
+        const fileName = `property_${Date.now()}_${asset.uri
+          .split("/")
+          .pop()}.${extension}`;
         return { uri: asset.uri, name: fileName, type: mimeType };
       });
       setForm({ ...form, images: [...form.images, ...newImages] });
@@ -92,7 +112,9 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
 
   const toggleFacility = (facility: string) => {
     setSelectedFacilities((prev) =>
-      prev.includes(facility) ? prev.filter((f) => f !== facility) : [...prev, facility]
+      prev.includes(facility)
+        ? prev.filter((f) => f !== facility)
+        : [...prev, facility]
     );
   };
 
@@ -107,7 +129,10 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
       !form.description ||
       (!isUpdate && form.images.length === 0)
     ) {
-      Alert.alert("Error", "Please fill all fields and select at least one image");
+      Alert.alert(
+        "Error",
+        "Please fill all fields and select at least one image"
+      );
       return false;
     }
 
@@ -116,7 +141,10 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
       isNaN(parseInt(form.bedrooms)) ||
       isNaN(parseInt(form.bathrooms))
     ) {
-      Alert.alert("Error", "Price, Bedrooms, and Bathrooms must be valid numbers");
+      Alert.alert(
+        "Error",
+        "Price, Bedrooms, and Bathrooms must be valid numbers"
+      );
       return false;
     }
 
@@ -128,44 +156,49 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
     return true;
   };
 
- const handleSubmit = async () => {
-  if (!validateForm()) return;
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
 
-  setUploading(true);
-  try {
-    const propertyData = {
-      name: form.name,
-      type: form.type,
-      price: parseFloat(form.price),
-      address: form.address,
-      bedrooms: parseInt(form.bedrooms),
-      bathrooms: parseInt(form.bathrooms),
-      area: parseFloat(form.area),
-      description: form.description,
-      facilities: selectedFacilities,
-      geolocation: form.geolocation,
-      status: property?.status || "available",
-      phone: form.phone,
-      images: form.images,
-    };
+    setUploading(true);
+    try {
+      const propertyData = {
+        name: form.name,
+        type: form.type,
+        price: parseFloat(form.price),
+        address: form.address,
+        bedrooms: parseInt(form.bedrooms),
+        bathrooms: parseInt(form.bathrooms),
+        area: parseFloat(form.area),
+        description: form.description,
+        facilities: selectedFacilities,
+        geolocation: form.geolocation,
+        status: property?.status || "available",
+        phone: form.phone,
+        images: form.images,
+      };
 
-    console.log("PropertyForm: Submitting property, isUpdate:", isUpdate);
-    if (isUpdate && property?._id) {
-      await updateProperty(property._id, propertyData);
-      Alert.alert("Success", "Property updated successfully");
-    } else {
-      console.log("PropertyForm: Calling createProperty with triggerPropertyRefresh");
-      await createProperty(propertyData, triggerPropertyRefresh);
-      Alert.alert("Success", "Property added successfully");
+      console.log("PropertyForm: Submitting property, isUpdate:", isUpdate);
+      if (isUpdate && property?._id) {
+        await updateProperty(property._id, propertyData);
+        Alert.alert("Success", "Property updated successfully");
+      } else {
+        console.log(
+          "PropertyForm: Calling createProperty with triggerPropertyRefresh"
+        );
+        await createProperty(propertyData, triggerPropertyRefresh);
+        Alert.alert("Success", "Property added successfully");
+      }
+      onClose();
+    } catch (error: any) {
+      console.error("PropertyForm: Property submission error:", error);
+      Alert.alert(
+        "Error",
+        `Failed to ${isUpdate ? "update" : "add"} property: ${error.message}`
+      );
+    } finally {
+      setUploading(false);
     }
-    onClose();
-  } catch (error: any) {
-    console.error("PropertyForm: Property submission error:", error);
-    Alert.alert("Error", `Failed to ${isUpdate ? "update" : "add"} property: ${error.message}`);
-  } finally {
-    setUploading(false);
-  }
-};
+  };
 
   const selectType = (type: string) => {
     setForm({ ...form, type });
@@ -179,7 +212,10 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
       className="flex-1"
       keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
     >
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={true}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={true}
+      >
         <View className="bg-white p-5 rounded-lg mx-5 my-3">
           <Text className="text-xl font-rubik-bold mb-4">
             {isUpdate ? "Update Property" : "Add New Property"}
@@ -285,19 +321,29 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
             onSubmitEditing={() => inputRefs.phone.current?.focus()}
           />
           <View className="mb-3">
-            <Text className="text-black-300 font-rubik-medium mb-2">Facilities</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+            <Text className="text-black-300 font-rubik-medium mb-2">
+              Facilities
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="flex-row"
+            >
               {facilitiesList.map((facility) => (
                 <TouchableOpacity
                   key={facility}
                   onPress={() => toggleFacility(facility)}
                   className={`border p-2 rounded-lg mr-2 ${
-                    selectedFacilities.includes(facility) ? "bg-primary-300" : "bg-gray-50"
+                    selectedFacilities.includes(facility)
+                      ? "bg-primary-300"
+                      : "bg-gray-50"
                   }`}
                 >
                   <Text
                     className={`text-sm ${
-                      selectedFacilities.includes(facility) ? "text-white" : "text-black-300"
+                      selectedFacilities.includes(facility)
+                        ? "text-white"
+                        : "text-black-300"
                     }`}
                   >
                     {facility}
@@ -316,7 +362,10 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
             onChangeText={(text) => setForm({ ...form, phone: text })}
             returnKeyType="done"
           />
-          <TouchableOpacity onPress={pickImage} className="bg-primary-200 p-3 rounded-lg mb-3">
+          <TouchableOpacity
+            onPress={pickImage}
+            className="bg-primary-200 p-3 rounded-lg mb-3"
+          >
             <Text className="text-white text-center">Select Images</Text>
           </TouchableOpacity>
           {form.images.length > 0 && (
@@ -327,7 +376,10 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
               keyExtractor={(item, index) => index.toString()}
               renderItem={({ item, index }) => (
                 <View className="relative mr-2">
-                  <Image source={{ uri: item.uri }} className="w-32 h-32 rounded-lg" />
+                  <Image
+                    source={{ uri: item.uri }}
+                    className="w-32 h-32 rounded-lg"
+                  />
                   <TouchableOpacity
                     onPress={() => removeImage(index)}
                     className="absolute top-1 right-1 bg-red-500 rounded-full w-6 h-6 justify-center items-center"
@@ -339,7 +391,10 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
             />
           )}
           <View className="flex flex-row justify-between">
-            <TouchableOpacity onPress={onClose} className="bg-gray-300 p-3 rounded-lg flex-1 mr-2">
+            <TouchableOpacity
+              onPress={onClose}
+              className="bg-gray-300 p-3 rounded-lg flex-1 mr-2"
+            >
               <Text className="text-black text-center">Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -348,7 +403,13 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
               disabled={uploading}
             >
               <Text className="text-white text-center">
-                {uploading ? (isUpdate ? "Updating..." : "Adding...") : (isUpdate ? "Update Property" : "Add Property")}
+                {uploading
+                  ? isUpdate
+                    ? "Updating..."
+                    : "Adding..."
+                  : isUpdate
+                  ? "Update Property"
+                  : "Add Property"}
               </Text>
             </TouchableOpacity>
           </View>
