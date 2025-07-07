@@ -1,7 +1,7 @@
-import { Tabs } from "expo-router";
-import { Image, ImageSourcePropType, Text, View } from "react-native";
-
+import { Tabs, useLocalSearchParams, useRouter } from "expo-router";
+import { Alert, Image, ImageSourcePropType, Text, View } from "react-native";
 import icons from "@/constants/icons";
+import { useEffect } from "react";
 
 const TabIcon = ({
   focused,
@@ -32,6 +32,19 @@ const TabIcon = ({
 );
 
 const TabsLayout = () => {
+  const router = useRouter();
+  const { paymentSuccess, propertyId } = useLocalSearchParams();
+
+  useEffect(() => {
+    if (paymentSuccess === "true" && propertyId) {
+      Alert.alert("Payment Status", "Payment successful!", [
+        { text: "OK", onPress: () => router.push(`/properties/${propertyId}`) },
+      ]);
+      // Clear params after showing alert to prevent re-triggering
+      router.setParams({ paymentSuccess: undefined, propertyId: undefined });
+    }
+  }, [paymentSuccess, propertyId, router]);
+
   return (
     <Tabs
       screenOptions={{

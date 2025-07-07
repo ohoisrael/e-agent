@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "y",
+      "bundleIdentifier": "com.israeloho.eagent",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

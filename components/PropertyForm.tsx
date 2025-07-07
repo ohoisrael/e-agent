@@ -16,16 +16,16 @@ import { useState, useRef } from "react";
 import * as ImagePicker from "expo-image-picker";
 import icons from "@/constants/icons";
 import { useGlobalContext } from "@/lib/global-provider";
-import { createProperty, uploadImage, updateProperty } from "@/lib/appwrite";
+import { createProperty, updateProperty } from "@/lib/appwrite";
 
 interface PropertyFormProps {
   onClose: () => void;
-  property?: any; // Existing property data for editing
-  isUpdate?: boolean; // Flag to indicate update mode
+  property?: any;
+  isUpdate?: boolean;
 }
 
 const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps) => {
-  const { user } = useGlobalContext();
+  const { user, triggerPropertyRefresh } = useGlobalContext(); // Add triggerPropertyRefresh
   const [form, setForm] = useState({
     name: property?.name || "",
     type: property?.type || "",
@@ -33,27 +33,31 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
     address: property?.address || "",
     bedrooms: property?.bedrooms?.toString() || "",
     bathrooms: property?.bathrooms?.toString() || "",
-    area: property?.area?.toString() || "",
+    area: "11", // hardcoded
     description: property?.description || "",
     facilities: property?.facilities?.join(", ") || "",
-    geolocation: property?.geolocation || "5.6082,-0.2528", // Default to Lapaz, Accra
-    image: property?.image ? { uri: property.image, name: `property_${Date.now()}.jpg`, type: "image/jpeg" } : null as { uri: string; name: string; type: string } | null,
+    geolocation: property?.geolocation || "5.6082,-0.2528", // default
+    images: property?.images?.map((img: string) => ({
+      uri: img,
+      name: `property_${Date.now()}.jpg`,
+      type: "image/jpeg",
+    })) || [],
     phone: property?.phone || "",
   });
+
   const [uploading, setUploading] = useState(false);
-  const [types] = useState<string[]>(["House", "SingleRoom", "Apartment", "Chamber&Hall"]); // Hardcoded types
-  const [facilitiesList] = useState<string[]>(["Wifi", "Laudry", "Gym", "Parking"]); // Hardcoded facilities
+  const [types] = useState<string[]>(["House", "SingleRoom", "Apartment", "Chamber&Hall"]);
+  const [facilitiesList] = useState<string[]>(["Wifi", "Laundry", "Gym", "Parking"]);
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>(property?.facilities || []);
-  const [isTypeModalVisible, setIsTypeModalVisible] = useState(false); // For custom dropdown
+  const [isTypeModalVisible, setIsTypeModalVisible] = useState(false);
+
   const inputRefs = {
     name: useRef<TextInput>(null),
     price: useRef<TextInput>(null),
     address: useRef<TextInput>(null),
     bedrooms: useRef<TextInput>(null),
     bathrooms: useRef<TextInput>(null),
-    area: useRef<TextInput>(null),
     description: useRef<TextInput>(null),
-    geolocation: useRef<TextInput>(null),
     phone: useRef<TextInput>(null),
   };
 
@@ -68,31 +72,28 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
+      allowsMultipleSelection: true,
     });
 
-    if (!result.canceled && result.assets[0].uri) {
-      const extension = result.assets[0].uri.split(".").pop()?.toLowerCase();
-      const mimeType = extension === "png" ? "image/png" : "image/jpeg";
-      const fileName = `property_${Date.now()}.${extension}`;
-      setForm({
-        ...form,
-        image: {
-          uri: result.assets[0].uri,
-          name: fileName,
-          type: mimeType,
-        },
+    if (!result.canceled && result.assets.length > 0) {
+      const newImages = result.assets.map((asset) => {
+        const extension = asset.uri.split(".").pop()?.toLowerCase();
+        const mimeType = extension === "png" ? "image/png" : "image/jpeg";
+        const fileName = `property_${Date.now()}_${asset.uri.split("/").pop()}.${extension}`;
+        return { uri: asset.uri, name: fileName, type: mimeType };
       });
+      setForm({ ...form, images: [...form.images, ...newImages] });
     }
   };
 
+  const removeImage = (index: number) => {
+    setForm({ ...form, images: form.images.filter((_, i) => i !== index) });
+  };
+
   const toggleFacility = (facility: string) => {
-    setSelectedFacilities((prev) => {
-      if (prev.includes(facility)) {
-        return prev.filter((f) => f !== facility); // Deselect if already selected
-      } else {
-        return [facility]; // Select only the new facility, replacing any previous selection
-      }
-    });
+    setSelectedFacilities((prev) =>
+      prev.includes(facility) ? prev.filter((f) => f !== facility) : [...prev, facility]
+    );
   };
 
   const validateForm = () => {
@@ -104,9 +105,9 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
       !form.bedrooms ||
       !form.bathrooms ||
       !form.description ||
-      (!isUpdate && !form.image)
+      (!isUpdate && form.images.length === 0)
     ) {
-      Alert.alert("Error", "Please fill all fields and select an image");
+      Alert.alert("Error", "Please fill all fields and select at least one image");
       return false;
     }
 
@@ -115,7 +116,7 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
       isNaN(parseInt(form.bedrooms)) ||
       isNaN(parseInt(form.bathrooms))
     ) {
-      Alert.alert("Error", "Price, Bedrooms, Bathrooms, and Area must be valid numbers");
+      Alert.alert("Error", "Price, Bedrooms, and Bathrooms must be valid numbers");
       return false;
     }
 
@@ -127,62 +128,58 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
     return true;
   };
 
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
+ const handleSubmit = async () => {
+  if (!validateForm()) return;
 
-    setUploading(true);
-    try {
-      let fileUrl = form.image?.uri || property?.image;
-      if (form.image && form.image.uri !== property?.image) {
-        const uploadResult = await uploadImage(form.image);
-        fileUrl = uploadResult.fileUrl;
-      }
+  setUploading(true);
+  try {
+    const propertyData = {
+      name: form.name,
+      type: form.type,
+      price: parseFloat(form.price),
+      address: form.address,
+      bedrooms: parseInt(form.bedrooms),
+      bathrooms: parseInt(form.bathrooms),
+      area: parseFloat(form.area),
+      description: form.description,
+      facilities: selectedFacilities,
+      geolocation: form.geolocation,
+      status: property?.status || "available",
+      phone: form.phone,
+      images: form.images,
+    };
 
-      const propertyData = {
-        name: form.name,
-        type: form.type,
-        price: parseFloat(form.price),
-        image: fileUrl,
-        address: form.address,
-        bedrooms: parseInt(form.bedrooms),
-        bathrooms: parseInt(form.bathrooms),
-        description: form.description,
-        facilities: selectedFacilities,
-        status: property?.status || "available",
-        phone: form.phone,
-      };
-
-      if (isUpdate) {
-        await updateProperty(property.$id, propertyData);
-        Alert.alert("Success", "Property updated successfully");
-      } else {
-        await createProperty(propertyData);
-        Alert.alert("Success", "Property added successfully");
-      }
-      onClose();
-    } catch (error: any) {
-      Alert.alert("Error", `Failed to ${isUpdate ? "update" : "add"} property: ${error.message}`);
-    } finally {
-      setUploading(false);
+    console.log("PropertyForm: Submitting property, isUpdate:", isUpdate);
+    if (isUpdate && property?._id) {
+      await updateProperty(property._id, propertyData);
+      Alert.alert("Success", "Property updated successfully");
+    } else {
+      console.log("PropertyForm: Calling createProperty with triggerPropertyRefresh");
+      await createProperty(propertyData, triggerPropertyRefresh);
+      Alert.alert("Success", "Property added successfully");
     }
-  };
+    onClose();
+  } catch (error: any) {
+    console.error("PropertyForm: Property submission error:", error);
+    Alert.alert("Error", `Failed to ${isUpdate ? "update" : "add"} property: ${error.message}`);
+  } finally {
+    setUploading(false);
+  }
+};
 
   const selectType = (type: string) => {
-    console.log("Selected type:", type);
     setForm({ ...form, type });
     setIsTypeModalVisible(false);
   };
 
+  // Rest of the component (JSX) remains unchanged
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       className="flex-1"
       keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
     >
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={true}
-      >
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={true}>
         <View className="bg-white p-5 rounded-lg mx-5 my-3">
           <Text className="text-xl font-rubik-bold mb-4">
             {isUpdate ? "Update Property" : "Add New Property"}
@@ -197,50 +194,41 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
             returnKeyType="next"
             onSubmitEditing={() => inputRefs.price.current?.focus()}
           />
-          <View className="mb-3">
-            {(
-              <TouchableOpacity
-                onPress={() => setIsTypeModalVisible(true)}
-                className="border border-primary-200 bg-gray-50 p-3 rounded-lg"
-              >
-                <Text className="text-black">
-                  {form.type || "Select Type"}
-                </Text>
-              </TouchableOpacity>
-            )}
-            <Modal
-              visible={isTypeModalVisible}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setIsTypeModalVisible(false)}
-            >
-              <View className="flex-1 justify-center items-center bg-black/50">
-                <View className="bg-white rounded-lg w-3/4 max-h-[300px] p-4">
-                  <FlatList
-                    data={types}
-                    keyExtractor={(item) => item}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        onPress={() => selectType(item)}
-                        className="p-3 border-b border-gray-200"
-                      >
-                        <Text className="text-black text-lg">{item}</Text>
-                      </TouchableOpacity>
-                    )}
-                    ListEmptyComponent={
-                      <Text className="text-black text-center">No types available</Text>
-                    }
-                  />
-                  <TouchableOpacity
-                    onPress={() => setIsTypeModalVisible(false)}
-                    className="mt-4 p-3 bg-gray-300 rounded-lg"
-                  >
-                    <Text className="text-black text-center">Close</Text>
-                  </TouchableOpacity>
-                </View>
+          <TouchableOpacity
+            onPress={() => setIsTypeModalVisible(true)}
+            className="border border-primary-200 bg-gray-50 p-3 rounded-lg mb-3"
+          >
+            <Text className="text-black">{form.type || "Select Type"}</Text>
+          </TouchableOpacity>
+          <Modal
+            visible={isTypeModalVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setIsTypeModalVisible(false)}
+          >
+            <View className="flex-1 justify-center items-center bg-black/50">
+              <View className="bg-white rounded-lg w-3/4 max-h-[300px] p-4">
+                <FlatList
+                  data={types}
+                  keyExtractor={(item) => item}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      onPress={() => selectType(item)}
+                      className="p-3 border-b border-gray-200"
+                    >
+                      <Text className="text-black text-lg">{item}</Text>
+                    </TouchableOpacity>
+                  )}
+                />
+                <TouchableOpacity
+                  onPress={() => setIsTypeModalVisible(false)}
+                  className="mt-4 p-3 bg-gray-300 rounded-lg"
+                >
+                  <Text className="text-black text-center">Close</Text>
+                </TouchableOpacity>
               </View>
-            </Modal>
-          </View>
+            </View>
+          </Modal>
           <TextInput
             ref={inputRefs.price}
             className="border border-primary-200 bg-gray-50 p-3 rounded-lg mb-3 text-black-300"
@@ -298,38 +286,25 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
           />
           <View className="mb-3">
             <Text className="text-black-300 font-rubik-medium mb-2">Facilities</Text>
-            {user?.role === "admin" && (
-              <Text className="text-black-200 text-sm mb-2">Note: Selecting facilities is optional.</Text>
-            )}
-            {facilitiesList.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="flex-row"
-              >
-                {facilitiesList.map((facility) => (
-                  <TouchableOpacity
-                    key={facility}
-                    onPress={() => toggleFacility(facility)}
-                    className={`border p-2 rounded-lg mr-2 ${
-                      selectedFacilities.includes(facility)
-                        ? "bg-primary-300 text-white"
-                        : "bg-gray-50"
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+              {facilitiesList.map((facility) => (
+                <TouchableOpacity
+                  key={facility}
+                  onPress={() => toggleFacility(facility)}
+                  className={`border p-2 rounded-lg mr-2 ${
+                    selectedFacilities.includes(facility) ? "bg-primary-300" : "bg-gray-50"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm ${
+                      selectedFacilities.includes(facility) ? "text-white" : "text-black-300"
                     }`}
                   >
-                    <Text
-                      className={`text-sm ${
-                        selectedFacilities.includes(facility) ? "text-white" : "text-black-300"
-                      }`}
-                    >
-                      {facility}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : (
-              <Text className="text-black-300">No facilities available</Text>
-            )}
+                    {facility}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
           <TextInput
             ref={inputRefs.phone}
@@ -341,20 +316,30 @@ const PropertyForm = ({ onClose, property, isUpdate = false }: PropertyFormProps
             onChangeText={(text) => setForm({ ...form, phone: text })}
             returnKeyType="done"
           />
-          <TouchableOpacity
-            onPress={pickImage}
-            className="bg-primary-200 p-3 rounded-lg mb-3"
-          >
-            <Text className="text-white text-center">Select Image</Text>
+          <TouchableOpacity onPress={pickImage} className="bg-primary-200 p-3 rounded-lg mb-3">
+            <Text className="text-white text-center">Select Images</Text>
           </TouchableOpacity>
-          {form.image && (
-            <Image source={{ uri: form.image.uri }} className="w-full h-32 rounded-lg mb-3" />
+          {form.images.length > 0 && (
+            <FlatList
+              data={form.images}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item, index }) => (
+                <View className="relative mr-2">
+                  <Image source={{ uri: item.uri }} className="w-32 h-32 rounded-lg" />
+                  <TouchableOpacity
+                    onPress={() => removeImage(index)}
+                    className="absolute top-1 right-1 bg-red-500 rounded-full w-6 h-6 justify-center items-center"
+                  >
+                    <Text className="text-white text-xs">X</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
           )}
           <View className="flex flex-row justify-between">
-            <TouchableOpacity
-              onPress={onClose}
-              className="bg-gray-300 p-3 rounded-lg flex-1 mr-2"
-            >
+            <TouchableOpacity onPress={onClose} className="bg-gray-300 p-3 rounded-lg flex-1 mr-2">
               <Text className="text-black text-center">Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity

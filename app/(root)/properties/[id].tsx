@@ -7,20 +7,29 @@ import {
   View,
   Dimensions,
   Platform,
-  Alert,
   Modal,
 } from "react-native";
-import { router, useLocalSearchParams, useRouter } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import icons from "@/constants/icons";
 import images from "@/constants/images";
 import Comment from "@/components/Comment";
 import { facilities } from "@/constants/data";
 import { useAppwrite } from "@/lib/useAppwrite";
-import { getPropertyById, createBooking, createPayment, updatePropertyStatus } from "@/lib/appwrite";
+import {
+  getPropertyById,
+  createBooking,
+  createPayment,
+  verifyPayment,
+  config,
+  startChat,
+  getAdminChats,
+} from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PropertyForm from "@/components/PropertyForm";
+import * as WebBrowser from "expo-web-browser";
+import ChatScreen from "@/components/ChatScreen";
 
 const Property = () => {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -28,79 +37,109 @@ const Property = () => {
   const [paying, setPaying] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const router = useRouter();
+  const [showChat, setShowChat] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(null);
 
   const windowHeight = Dimensions.get("window").height;
 
   const { data: property } = useAppwrite({
     fn: getPropertyById,
-    params: {
-      id: id!,
-    },
+    params: { id: id || "" },
   });
 
-  console.log("User:", user);
-  console.log("Property:", property);
-
-  const handlePayment = async (status: "success" | "cancelled") => {
-    if (!user || !user.$id) {
-      Alert.alert("Error", "User not logged in or invalid user ID");
-      router.push("/sign-in");
-      return;
+  useEffect(() => {
+    if (user?.role === "admin" && !chatId) {
+      fetchAdminChats();
     }
-    if (!property || !property.$id) {
-      Alert.alert("Error", "Property data is invalid or not loaded");
-      return;
-    }
+  }, [user, chatId]);
 
+  const fetchAdminChats = async () => {
+    try {
+      const chats = await getAdminChats();
+      if (chats.length > 0) {
+        setChatId(chats[0]._id);
+      }
+    } catch (error) {
+      console.error("Failed to fetch admin chats:", error);
+    }
+  };
+
+  if (!property) {
+    return (
+      <SafeAreaView className="flex-1 bg-white justify-center items-center">
+        <Text className="text-black-300">Loading property...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const handlePayment = async () => {
     setPaying(true);
     try {
-      const reference = `fake_ref_${Date.now()}`;
-      const propertyId = property.$id;
-      console.log("Attempting payment with propertyId:", propertyId, "userId:", user.$id, "status:", status);
-      if (status === "success") {
-        await createBooking({
-          userId: user.$id,
-          propertyId: propertyId,
-          status: "confirmed",
-        });
-        console.log("Booking created successfully");
-        await createPayment({
-          userId: user.$id,
-          propertyId: propertyId,
-          amount: property.price,
-          paystackRef: reference,
-          status: "success",
-        });
-        console.log("Payment created successfully");
-        await updatePropertyStatus(propertyId, "unavailable");
-        console.log("Property status updated successfully");
-        Alert.alert("Success", "Payment successful! Property booked.", [
-          { text: "OK", onPress: () => router.push("/") }
-        ]);
-      } else {
-        await createPayment({
-          userId: user.$id,
-          propertyId: propertyId,
-          amount: property.price,
-          paystackRef: reference,
-          status: "cancelled",
-        });
-        console.log("Payment cancelled successfully");
-        Alert.alert("Cancelled", "Payment was cancelled.", [
-          { text: "OK", onPress: () => router.push(`/properties/${propertyId}`) }
-        ]);
+      const paymentResult = await createPayment({
+        userId: user._id,
+        propertyId: property._id,
+        amount: property.price,
+      });
+      console.log("Payment Result:", paymentResult);
+      if (paymentResult && paymentResult.authorization_url) {
+        const redirectResult = await WebBrowser.openAuthSessionAsync(
+          paymentResult.authorization_url,
+          `${config.endpoint}/payment/verify/${paymentResult.reference}`
+        );
+        console.log("Redirect Result:", redirectResult);
+        if (
+          redirectResult.type === "success" ||
+          redirectResult.type === "cancel"
+        ) {
+          const verification = await verifyPayment(paymentResult.reference);
+          console.log("Verification Result:", verification);
+          if (verification.status === "success") {
+            await createBooking({
+              userId: user._id,
+              propertyId: property._id,
+              status: "confirmed",
+            });
+          }
+        }
       }
     } catch (error: any) {
       console.error("Payment processing error details:", error);
-      Alert.alert("Error", `Payment processing failed: ${error.message}`);
     } finally {
       setPaying(false);
       setShowPaymentModal(false);
     }
   };
 
-  if (!property) return null;
+  const handleStartChat = async () => {
+    if (!user || !user._id) {
+      console.error("Please log in to start a chat.");
+      router.push("/sign-in");
+      return;
+    }
+    if (!user.name) {
+      console.error(
+        "Your profile is missing a name. Please update your profile to start a chat."
+      );
+      router.push("/profile");
+      return;
+    }
+    try {
+      const response = await startChat({
+        userId: user._id,
+        adminId: "admin",
+        userName: user.name,
+      });
+      const chatId = response.chatId;
+      if (chatId) {
+        setChatId(chatId);
+        setShowChat(true);
+      } else {
+        console.error("Failed to initialize chat: No chatId returned");
+      }
+    } catch (error) {
+      console.error("Chat initiation error:", error);
+    }
+  };
 
   return (
     <View className="flex-1">
@@ -110,9 +149,12 @@ const Property = () => {
       >
         <View className="relative w-full" style={{ height: windowHeight / 2 }}>
           <Image
-            source={{ uri: property?.image }}
+            source={{ uri: property?.images?.[0] }}
             className="size-full"
             resizeMode="cover"
+            onError={(e) =>
+              console.log("Image load error:", e.nativeEvent.error)
+            }
           />
           <Image
             source={images.whiteGradient}
@@ -120,9 +162,7 @@ const Property = () => {
           />
           <View
             className="z-50 absolute inset-x-7"
-            style={{
-              top: Platform.OS === "ios" ? 70 : 20,
-            }}
+            style={{ top: Platform.OS === "ios" ? 70 : 20 }}
           >
             <View className="flex flex-row items-center w-full justify-between">
               <TouchableOpacity
@@ -152,9 +192,6 @@ const Property = () => {
                 {property?.type}
               </Text>
             </View>
-            <View className="flex flex-row items-center gap-2">
-              
-            </View>
           </View>
           {user?.role === "admin" && (
             <TouchableOpacity
@@ -177,7 +214,6 @@ const Property = () => {
             <Text className="text-black-300 text-sm font-rubik-medium ml-2">
               {property?.bathrooms} Baths
             </Text>
-            
           </View>
           <View className="w-full border-t border-primary-200 pt-7 mt-5">
             <Text className="text-black-300 text-xl font-rubik-bold">
@@ -190,12 +226,16 @@ const Property = () => {
                     Contact: {property?.phone}
                   </Text>
                   <View className="flex flex-row items-center gap-3">
-                    <TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleStartChat}
+                      className="flex flex-row items-center gap-1"
+                    >
                       <Image source={icons.chat} className="size-7" />
+                      <Text className="text-black-200 text-sm font-rubik-medium">
+                        Start Chat
+                      </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity>
-                      <Image source={icons.phone} className="size-7" />
-                    </TouchableOpacity>
+                    
                   </View>
                 </View>
               ) : (
@@ -217,7 +257,7 @@ const Property = () => {
             <Text className="text-black-300 text-xl font-rubik-bold">
               Facilities
             </Text>
-            {property?.facilities.length > 0 && (
+            {property?.facilities?.length > 0 && (
               <View className="flex flex-row flex-wrap items-start justify-start mt-2 gap-5">
                 {property?.facilities.map((item: string, index: number) => {
                   const facility = facilities.find(
@@ -247,21 +287,27 @@ const Property = () => {
               </View>
             )}
           </View>
-          {property?.gallery.length > 0 && (
+          {property?.images?.length > 0 && (
             <View className="mt-7">
               <Text className="text-black-300 text-xl font-rubik-bold">
                 Gallery
               </Text>
               <FlatList
                 contentContainerStyle={{ paddingRight: 20 }}
-                data={property?.gallery}
-                keyExtractor={(item) => item.$id}
+                data={property?.images}
+                keyExtractor={(item, index) => index.toString()}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 renderItem={({ item }) => (
                   <Image
-                    source={{ uri: item.image }}
+                    source={{ uri: item }}
                     className="size-40 rounded-xl"
+                    onError={(e) =>
+                      console.log(
+                        "Gallery image load error:",
+                        e.nativeEvent.error
+                      )
+                    }
                   />
                 )}
                 contentContainerClassName="flex gap-4 mt-3"
@@ -278,9 +324,8 @@ const Property = () => {
                 {property?.address}
               </Text>
             </View>
-            
           </View>
-          {property?.reviews.length > 0 && (
+          {property?.reviews?.length > 0 && (
             <View className="mt-7">
               <View className="flex flex-row items-center justify-between">
                 <View className="flex flex-row items-center">
@@ -317,12 +362,22 @@ const Property = () => {
               </Text>
             </View>
             <TouchableOpacity
-              onPress={() => setShowPaymentModal(true)}
+              onPress={() => {
+                if (!user || !user._id) {
+                  router.push("/sign-in");
+                } else {
+                  setShowPaymentModal(true);
+                }
+              }}
               className="flex-1 flex flex-row items-center justify-center bg-primary-300 py-3 rounded-full shadow-md shadow-zinc-400"
               disabled={paying || property.status === "unavailable"}
             >
               <Text className="text-white text-lg text-center font-rubik-bold">
-                {paying ? "Processing..." : property.status === "unavailable" ? "Booked" : "Book Now"}
+                {paying
+                  ? "Processing..."
+                  : property.status === "unavailable"
+                  ? "Booked"
+                  : "Book Now"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -337,11 +392,12 @@ const Property = () => {
           />
         </SafeAreaView>
       </Modal>
-      <Modal
-        visible={showPaymentModal}
-        animationType="fade"
-        transparent={true}
-      >
+      <Modal visible={showChat} animationType="slide" transparent={false}>
+        <SafeAreaView className="flex-1 bg-white">
+          <ChatScreen chatId={chatId} />
+        </SafeAreaView>
+      </Modal>
+      <Modal visible={showPaymentModal} animationType="fade" transparent={true}>
         <View className="flex-1 justify-center items-center bg-black/50">
           <View className="bg-white p-5 rounded-lg w-4/5">
             <Text className="text-xl font-rubik-bold text-black-300 mb-4">
@@ -355,7 +411,10 @@ const Property = () => {
             </Text>
             <View className="flex flex-row justify-between gap-3">
               <TouchableOpacity
-                onPress={() => handlePayment("cancelled")}
+                onPress={() => {
+                  setShowPaymentModal(false);
+                  router.push("/(tabs)");
+                }}
                 className="flex-1 bg-gray-300 py-3 rounded-lg"
                 disabled={paying}
               >
@@ -364,7 +423,7 @@ const Property = () => {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => handlePayment("success")}
+                onPress={handlePayment}
                 className="flex-1 bg-primary-300 py-3 rounded-lg"
                 disabled={paying}
               >

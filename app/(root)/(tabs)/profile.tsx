@@ -1,23 +1,12 @@
-import {
-  Alert,
-  Image,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-  TextInput,
-  Modal,
-  ImageSourcePropType,
-} from "react-native";
+import { Alert, Image, SafeAreaView, ScrollView, Text, TouchableOpacity, View, TextInput, Modal, ImageSourcePropType } from "react-native";
 import React, { useState } from "react";
 import icons from "@/constants/icons";
 import images from "@/constants/images";
 import { useGlobalContext } from "@/lib/global-provider";
-import { logout, updateUserName } from "@/lib/appwrite";
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import { settings } from "@/constants/data";
 import PropertyForm from "@/components/PropertyForm";
+import { logout } from "@/lib/appwrite";
 
 interface SettingsItemProp {
   icon: ImageSourcePropType;
@@ -49,7 +38,7 @@ const SettingsItem = ({
 );
 
 const NameUpdateForm = ({ onClose, userId }: { onClose: () => void; userId: string }) => {
-  const { refetch } = useGlobalContext();
+  const { refetchUser } = useGlobalContext();
   const [name, setName] = useState("");
   const [updating, setUpdating] = useState(false);
 
@@ -63,7 +52,7 @@ const NameUpdateForm = ({ onClose, userId }: { onClose: () => void; userId: stri
     try {
       await updateUserName(userId, name.trim());
       Alert.alert("Success", "Name updated successfully");
-      refetch(); // Refresh user context immediately
+      refetchUser();
       onClose();
     } catch (error: any) {
       Alert.alert("Error", `Failed to update name: ${error.message}`);
@@ -103,15 +92,16 @@ const NameUpdateForm = ({ onClose, userId }: { onClose: () => void; userId: stri
 };
 
 const Profile = () => {
-  const { user, refetch } = useGlobalContext();
+  const { user, refetchUser } = useGlobalContext();
+  const router = useRouter();
   const [showAddProperty, setShowAddProperty] = useState(false);
   const [showNameForm, setShowNameForm] = useState(false);
 
   const handleLogout = async () => {
     const result = await logout();
     if (result) {
-      refetch();
-      router.push("/sign-in");
+      await refetchUser(); // Force re-fetch to update isLogged
+      router.replace("/sign-in"); // Use replace to ensure navigation
     } else {
       Alert.alert("Error", "Failed to logout");
     }
@@ -133,7 +123,8 @@ const Profile = () => {
           <View className="flex flex-col items-center relative mt-5">
             <Image
               source={{ uri: user?.avatar || images.student }}
-              className="size-44 relative rounded-full"
+              className="size-44 rounded-full"
+              onError={(e) => console.log("Avatar load error:", e.nativeEvent.error)}
             />
             {isPhoneUser && (
               <TouchableOpacity
@@ -172,19 +163,15 @@ const Profile = () => {
           </View>
         )}
         {user?.role !== "admin" && (
-  <View className="flex flex-col mt-10">
-    <SettingsItem
-      icon={icons.calendar}
-      title="My Bookings"
-      onPress={() => router.push("/bookings")}
-    />
-    <SettingsItem
-      icon={icons.wallet}
-      title="My Payments"
-      onPress={() => router.push("/payments")}
-    />
-  </View>
-)}
+          <View className="flex flex-col mt-10">
+            
+            <SettingsItem
+              icon={icons.wallet}
+              title="My Payments"
+              onPress={() => router.push("/payments")}
+            />
+          </View>
+        )}
         <View className="flex flex-col mt-5 border-t pt-5 border-primary-200">
           {settings.slice(2).map((item, index) => (
             <SettingsItem key={index} {...item} />
@@ -209,7 +196,7 @@ const Profile = () => {
         <SafeAreaView className="flex-1 bg-white">
           <NameUpdateForm
             onClose={() => setShowNameForm(false)}
-            userId={user?.$id || ""}
+            userId={user?._id || user?.$id || ""}
           />
         </SafeAreaView>
       </Modal>

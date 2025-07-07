@@ -1,15 +1,6 @@
-import React, { createContext, useContext, ReactNode, useMemo } from "react";
-
-import { getCurrentUser } from "./appwrite";
-import { useAppwrite } from "./useAppwrite";
-import { Redirect } from "expo-router";
-
-interface GlobalContextType {
-  isLogged: boolean;
-  user: User | null;
-  loading: boolean;
-  refetch: () => void;
-}
+import { createContext, useContext, ReactNode, useMemo, useState, useCallback } from "react";
+import { getCurrentUser, getLatestProperties } from "./appwrite";
+import useAppwrite from "./useAppwrite";
 
 interface User {
   $id: string;
@@ -19,44 +10,62 @@ interface User {
   role: string;
 }
 
-const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
-
-interface GlobalProviderProps {
-  children: ReactNode;
+interface GlobalContextType {
+  isLogged: boolean;
+  user: User | null;
+  loading: boolean;
+  refetchUser: () => Promise<void>;
+  refetchProperties: () => Promise<void>;
+  triggerPropertyRefresh: () => void;
+  refreshTrigger: number;
 }
 
-export const GlobalProvider = ({ children }: GlobalProviderProps) => {
+const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
+
+export const GlobalProvider = ({ children }: { children: ReactNode }) => {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   const {
     data: user,
-    loading,
-    refetch,
-  } = useAppwrite({
-    fn: getCurrentUser,
+    loading: loadingUser,
+    refetch: refetchUser,
+  } = useAppwrite<User, {}>({ fn: getCurrentUser, skip: false });
+
+  const { refetch: refetchProperties } = useAppwrite({
+    fn: getLatestProperties,
+    skip: true,
   });
 
   const isLogged = !!user;
+  const loading = loadingUser;
 
-  // Memoize the context value to prevent unnecessary re-renders
-  const value = useMemo(() => ({
-    isLogged,
-    user,
-    loading,
-    refetch,
-  }), [isLogged, user, loading, refetch]);
+  const triggerPropertyRefresh = useCallback(() => {
+    setRefreshTrigger((prev) => {
+      console.log("GlobalProvider: triggerPropertyRefresh called, new refreshTrigger:", prev + 1);
+      return prev + 1;
+    });
+  }, []);
 
-  return (
-    <GlobalContext.Provider value={value}>
-      {children}
-    </GlobalContext.Provider>
+  const value = useMemo(
+    () => ({
+      isLogged,
+      user,
+      loading,
+      refetchUser,
+      refetchProperties,
+      triggerPropertyRefresh,
+      refreshTrigger,
+    }),
+    [isLogged, user, loading, refetchUser, refetchProperties, triggerPropertyRefresh, refreshTrigger]
   );
+
+  return <GlobalContext.Provider value={value}>{children}</GlobalContext.Provider>;
 };
 
-export const useGlobalContext = (): GlobalContextType => {
-  const context = useContext(GlobalContext);
-  if (!context)
-    throw new Error("useGlobalContext must be used within a GlobalProvider");
-
-  return context;
+export const useGlobalContext = () => {
+  const ctx = useContext(GlobalContext);
+  if (!ctx) throw new Error("useGlobalContext must be used within GlobalProvider");
+  return ctx;
 };
 
 export default GlobalProvider;
