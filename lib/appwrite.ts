@@ -34,11 +34,11 @@ export async function getCurrentUser() {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("getCurrentUser - HTTP error:", response.status, errorText);
+      
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const user = await response.json();
-    console.log("getCurrentUser - Response:", user);
+    
     return user;
   } catch (error) {
     console.error("Failed to fetch current user:", error);
