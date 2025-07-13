@@ -150,11 +150,7 @@ const Profile = () => {
               title="Add Property"
               onPress={() => setShowAddProperty(true)}
             />
-            <SettingsItem
-              icon={icons.calendar}
-              title="View All Bookings"
-              onPress={() => router.push("/admin/bookings")}
-            />
+            
             <SettingsItem
               icon={icons.wallet}
               title="View All Payments"
