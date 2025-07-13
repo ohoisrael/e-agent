@@ -6,8 +6,8 @@ import { router } from "expo-router";
 import { useGlobalContext } from "./global-provider";
 
 export const config = {
-  endpoint: "http://172.16.7.89:5000/api",
-  socketEndpoint: "http://172.16.7.89:5000",
+  endpoint: "https://e-agent-backend.onrender.com/api",
+  socketEndpoint: "https://e-agent-backend.onrender.com",
   databaseId: "propertyApp",
   propertiesCollectionId: "properties",
   bookingsCollectionId: "bookings",
@@ -34,11 +34,11 @@ export async function getCurrentUser() {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("getCurrentUser - HTTP error:", response.status, errorText);
+      
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const user = await response.json();
-    console.log("getCurrentUser - Response:", user);
+    
     return user;
   } catch (error) {
     console.error("Failed to fetch current user:", error);
