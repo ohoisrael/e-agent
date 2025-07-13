@@ -4,55 +4,52 @@ import { useGlobalContext } from "@/lib/global-provider";
 import { router } from "expo-router";
 import icons from "@/constants/icons";
 import { getPayments } from "@/lib/appwrite";
+import { useEffect } from "react";
 
 const Payments = () => {
   const { user } = useGlobalContext();
-  const { data: payments, isLoading } = useAppwrite({
+  const { data: payments } = useAppwrite({
     fn: getPayments,
-    params: { userId: user?.$id || user?._id },
+    params: { userId: user?._id || user?.$id },
   });
 
-  if (isLoading) {
-    return (
-      <SafeAreaView className="flex-1 bg-white justify-center items-center">
-        <Text className="text-gray-500">Loading payments...</Text>
-      </SafeAreaView>
-    );
-  }
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!user || (!user._id && !user.$id)) {
+      router.replace("/sign-in");
+    }
+  }, [user]);
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-row items-center px-4 pt-4">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Image 
-            source={icons.backArrow} 
+        <TouchableOpacity onPress={() => router.push("/profile")}>
+          <Image
+            source={icons.backArrow}
             className="w-6 h-6"
             resizeMode="contain"
           />
         </TouchableOpacity>
-        <Text className="flex-1 text-xl font-bold text-center">My Payments</Text>
+        <Text className="flex-1 text-xl font-bold text-center">
+          My Payments ({payments?.length || 0})
+        </Text>
         <View className="w-6" />
       </View>
 
       <ScrollView className="px-4 mt-4">
-        {payments?.length > 0 ? (
-          payments.map((payment) => (
-            <View key={payment._id || payment.$id} className="mb-4 p-4 border border-gray-200 rounded-lg">
-              {payment.propertyId?.name ? (
-                <Text className="text-lg font-semibold">{payment.propertyId.name}</Text>
-              ) : (
-                <Text className="text-lg font-semibold">Property</Text>
-              )}
-              <Text className="text-gray-500 mt-1">
-                Paid on: {new Date(payment.createdAt).toLocaleDateString()}
-              </Text>
-              <Text className="text-gray-500 mt-1">Amount: ₵{payment.amount}</Text>
+        {payments && payments.length > 0 ? (
+          payments.map((status, index) => (
+            <View
+              key={index} // Use index as key since response is an array of strings
+              className="mb-4 p-4 border border-gray-200 rounded-lg"
+            >
+              <Text className="text-lg font-semibold">Payment {index + 1}</Text>
+              <Text className="text-gray-500 mt-1">Status: {status}</Text>
+              
             </View>
           ))
         ) : (
-          <View className="mt-8">
-            <Text className="text-gray-500 text-center">No payments found</Text>
-          </View>
+          <Text className="text-gray-500 text-center mt-8">No payments found</Text>
         )}
       </ScrollView>
     </SafeAreaView>
