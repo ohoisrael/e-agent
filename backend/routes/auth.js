@@ -115,4 +115,52 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
+router.post('/register/admin', async (req, res) => {
+  try {
+    const { name, email, password, phone } = req.body;
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
+    const user = new User({ 
+      name, 
+      email, 
+      password: hashedPassword, 
+      phone, 
+      role: 'admin' // Explicitly set role to admin
+    });
+    await user.save();
+    const token = jwt.sign({ id: user._id, role: user.role, email: user.email }, process.env.JWT_SECRET);
+    res.status(201).json({ message: 'Landlord registered', userId: user._id, token });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.post('/register/phone/admin', async (req, res) => {
+  try {
+    const { phone, name } = req.body;
+    const user = await User.findOne({ phone });
+    if (user) {
+      return res.status(400).json({ message: 'Phone number already registered' });
+    }
+
+    const newUser = new User({ 
+      phone, 
+      name, 
+      role: 'admin', // Explicitly set role to admin
+      status: 'pending' 
+    });
+    await newUser.save();
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expireIn = Date.now() + 15 * 60 * 1000;
+    const otpDoc = new OTP({ userId: newUser._id, otp, expireIn, status: 'pending' });
+    await otpDoc.save();
+
+    await sms.sendOTP(phone, otp);
+    const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET);
+    res.json({ userId: newUser._id, token });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
 module.exports = router;

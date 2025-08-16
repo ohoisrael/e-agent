@@ -144,7 +144,7 @@ const Profile = () => {
         </View>
         {user?.role === "admin" && (
           <View className="flex flex-col mt-10 border-t pt-5 border-primary-200">
-            <Text className="text-xl font-rubik-bold mb-3">Admin Actions</Text>
+            <Text className="text-xl font-rubik-bold mb-3">Landlord Actions</Text>
             <SettingsItem
               icon={icons.home}
               title="Add Property"

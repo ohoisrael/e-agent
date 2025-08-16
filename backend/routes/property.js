@@ -157,7 +157,7 @@ router.put('/:propertyId/status', async (req, res) => {
 
 router.get('/latest', async (req, res) => {
   try {
-    const properties = await Property.find({ status: 'available' }).sort({ createdAt: -1 }).limit(5);
+    const properties = await Property.find().sort({ createdAt: -1 }).limit(5);
     res.json(properties);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -167,7 +167,7 @@ router.get('/latest', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { filter, query, limit } = req.query;
-    let queryObj = { status: 'available' };
+    let queryObj = {};
 
     console.log("Received query params:", { filter, query, limit }); // Debug log
 

@@ -68,7 +68,6 @@ export default function Index() {
               </Text>
             </View>
           </View>
-          <Image source={icons.bell} className="size-6" />
         </View>
         <View className="my-5">
           <View className="flex flex-row items-center justify-between">

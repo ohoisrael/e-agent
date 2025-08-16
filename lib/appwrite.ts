@@ -34,11 +34,11 @@ export async function getCurrentUser() {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      
+
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const user = await response.json();
-    
+
     return user;
   } catch (error) {
     console.error("Failed to fetch current user:", error);
@@ -689,6 +689,63 @@ export async function getAdminChats() {
     return chats;
   } catch (error) {
     console.error("Failed to fetch admin chats:", error);
+    throw error;
+  }
+}
+
+export async function registerAdmin({
+  email,
+  password,
+  name,
+}: {
+  email: string;
+  password: string;
+  name: string;
+}) {
+  try {
+    const response = await fetch(`${config.endpoint}/auth/register/admin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, name }),
+    });
+    const data = await response.json();
+    console.log("registerAdmin - Response:", data);
+    if (response.ok && data.token) {
+      await AsyncStorage.setItem("token", data.token);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Admin register failed:", error);
+    throw error;
+  }
+}
+
+export async function registerAdminWithPhone({
+  phone,
+  name,
+}: {
+  phone: string;
+  name: string;
+}) {
+  try {
+    const response = await fetch(
+      `${config.endpoint}/auth/register/phone/admin`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, name }),
+      }
+    );
+    const data = await response.json();
+    console.log("registerAdminWithPhone - Response:", data);
+    if (response.ok && data.userId && data.token) {
+      await AsyncStorage.setItem("token", data.token);
+      return { userId: data.userId, token: data.token };
+    }
+    return null;
+  } catch (error) {
+    console.error("Admin phone register failed:", error);
     throw error;
   }
 }

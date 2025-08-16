@@ -19,6 +19,8 @@ import {
   verifyPhoneToken,
   register,
   registerWithPhone,
+  registerAdmin,
+  registerAdminWithPhone,
 } from "@/lib/appwrite";
 import {
   KeyboardAvoidingView,
@@ -40,6 +42,7 @@ const SignIn = () => {
   } | null>(null);
   const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
   const [isRegister, setIsRegister] = useState(false);
+  const [isAdminRegister, setIsAdminRegister] = useState(false);
   const [localLoading, setLocalLoading] = useState(false);
 
   console.log("SignIn - Loading:", loading, "IsLogged:", isLogged);
@@ -58,10 +61,16 @@ const SignIn = () => {
     setLocalLoading(true);
     try {
       if (isRegister) {
-        const result = await register({ email, password, name });
+        let result;
+        if (isAdminRegister) {
+          result = await registerAdmin({ email, password, name });
+        } else {
+          result = await register({ email, password, name });
+        }
+        
         if (result) {
           await refetchUser();
-          Alert.alert("Success", "Registration successful");
+          Alert.alert("Success", `Registration successful as ${isAdminRegister ? 'admin' : 'user'}`);
           setIsRegister(false);
         } else {
           Alert.alert("Error", "Registration failed. Please try again.");
@@ -96,7 +105,13 @@ const SignIn = () => {
     setLocalLoading(true);
     try {
       if (isRegister) {
-        const result = await registerWithPhone({ phone, name }); // Use phone as entered (e.g., 0201818192)
+        let result;
+        if (isAdminRegister) {
+          result = await registerAdminWithPhone({ phone, name });
+        } else {
+          result = await registerWithPhone({ phone, name });
+        }
+        
         if (result && result.userId && result.token) {
           const { userId, token } = result;
           setPhoneToken({ userId, token });
@@ -105,7 +120,7 @@ const SignIn = () => {
           Alert.alert("Error", "Registration failed. Please try again.");
         }
       } else {
-        const { userId, token } = await loginWithPhone(phone); // Use phone as entered (e.g., 0201818192)
+        const { userId, token } = await loginWithPhone(phone);
         setPhoneToken({ userId, token });
         Alert.alert("Success", "OTP sent to your phone");
       }
@@ -173,6 +188,8 @@ const SignIn = () => {
               Let's Get You Closer to {"\n"}
               <Text className="text-primary-300">Your ideal Property</Text>
             </Text>
+            
+            {/* Login Method Tabs (Email/Phone) */}
             <View className="flex flex-row justify-around mt-8">
               <TouchableOpacity
                 onPress={() => setLoginMethod("email")}
@@ -203,9 +220,44 @@ const SignIn = () => {
                 </Text>
               </TouchableOpacity>
             </View>
+            
+            {/* User Type Tabs (Regular/Admin) - Only shown during registration */}
+            {isRegister && (
+              <View className="flex flex-row justify-around mt-4">
+                <TouchableOpacity
+                  onPress={() => setIsAdminRegister(false)}
+                  className={`py-2 px-4 rounded-full ${
+                    !isAdminRegister ? "bg-primary-300" : "bg-primary-100"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm ${
+                      !isAdminRegister ? "text-white" : "text-black-300"
+                    } font-rubik`}
+                  >
+                    Regular User
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setIsAdminRegister(true)}
+                  className={`py-2 px-4 rounded-full ${
+                    isAdminRegister ? "bg-primary-300" : "bg-primary-100"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm ${
+                      isAdminRegister ? "text-white" : "text-black-300"
+                    } font-rubik`}
+                  >
+                    Landlord
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
             <View className="flex flex-row justify-center mt-4">
               <Text className="text-sm font-rubik text-black-200">
-                Already have an account?{" "}
+                {isRegister ? "Already have an account? " : "Don't have an account? "}
               </Text>
               <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
                 <Text className="text-sm font-rubik text-primary-300 underline">
@@ -213,10 +265,13 @@ const SignIn = () => {
                 </Text>
               </TouchableOpacity>
             </View>
+            
             {loginMethod === "email" ? (
               <>
                 <Text className="text-lg font-rubik text-black-200 text-center mt-12">
-                  {isRegister ? "Register with Email" : "Login with Email"}
+                  {isRegister 
+                    ? `Register with Email as ${isAdminRegister ? 'Landlord' : 'User'}`
+                    : "Login with Email"}
                 </Text>
                 {isRegister && (
                   <TextInput
@@ -253,7 +308,7 @@ const SignIn = () => {
                     {localLoading ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : isRegister ? (
-                      "Register"
+                      `Register as ${isAdminRegister ? 'Lanlord' : 'User'}`
                     ) : (
                       "Login"
                     )}
@@ -264,7 +319,7 @@ const SignIn = () => {
               <>
                 <Text className="text-lg font-rubik text-black-200 text-center mt-12">
                   {isRegister
-                    ? "Register with Phone"
+                    ? `Register with Phone as ${isAdminRegister ? 'Landlord' : 'User'}`
                     : "Login with Phone Number"}
                 </Text>
                 {isRegister && (
@@ -295,7 +350,7 @@ const SignIn = () => {
                         {localLoading ? (
                           <ActivityIndicator size="small" color="#fff" />
                         ) : isRegister ? (
-                          "Register"
+                          `Register as ${isAdminRegister ? 'Landlord' : 'User'}`
                         ) : (
                           "Send OTP"
                         )}

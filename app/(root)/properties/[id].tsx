@@ -171,14 +171,7 @@ const Property = () => {
               >
                 <Image source={icons.backArrow} className="size-5" />
               </TouchableOpacity>
-              <View className="flex flex-row items-center gap-3">
-                <Image
-                  source={icons.heart}
-                  className="size-7"
-                  tintColor={"#191D31"}
-                />
-                <Image source={icons.send} className="size-7" />
-              </View>
+              
             </View>
           </View>
         </View>
@@ -369,14 +362,16 @@ const Property = () => {
                   setShowPaymentModal(true);
                 }
               }}
-              className="flex-1 flex flex-row items-center justify-center bg-primary-300 py-3 rounded-full shadow-md shadow-zinc-400"
-              disabled={paying || property.status === "unavailable"}
+              className={`flex-1 flex flex-row items-center justify-center py-3 rounded-full shadow-md shadow-zinc-400 ${
+                property.status === "booked" ? "bg-gray-400" : "bg-primary-300"
+              }`}
+              disabled={paying || property.status === "booked"}
             >
               <Text className="text-white text-lg text-center font-rubik-bold">
                 {paying
                   ? "Processing..."
-                  : property.status === "unavailable"
-                  ? "Booked"
+                  : property.status === "booked"
+                  ? "Already Booked"
                   : "Book Now"}
               </Text>
             </TouchableOpacity>
