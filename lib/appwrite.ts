@@ -6,8 +6,8 @@ import { router } from "expo-router";
 import { useGlobalContext } from "./global-provider";
 
 export const config = {
-  endpoint: "http://172.20.10.2:5000/api",
-  socketEndpoint: "http://172.20.10.2:5000",
+  endpoint: "https://e-agent-backend.onrender.com/api",
+  socketEndpoint: "https://e-agent-backend.onrender.com",
   databaseId: "propertyApp",
   propertiesCollectionId: "properties",
   bookingsCollectionId: "bookings",
