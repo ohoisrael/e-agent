@@ -399,7 +399,7 @@ const ChatScreen = ({ chatId: propChatId }: { chatId?: string }) => {
         <Text className="text-lg font-rubik-bold text-black-300">
           {user?.role === "admin"
             ? `Chat with ${selectedChat?.userName || "User"}`
-            : "Chat with Admin"}
+            : "Chat with Landlord"}
         </Text>
         <TouchableOpacity className="p-2">
           <Image source={icons.info} className="size-6" tintColor="#666876" />

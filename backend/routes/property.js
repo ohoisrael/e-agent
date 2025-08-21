@@ -5,6 +5,7 @@ const multer = require('multer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
 const path = require('path');
+const auth = require('../middleware/auth');
 
 const s3 = new S3Client({
   region: 'eu-north-1',
@@ -14,13 +15,11 @@ const s3 = new S3Client({
   },
 });
 
-const upload = multer({ storage: multer.memoryStorage() }); // Store files in memory for S3 upload
+const upload = multer({ storage: multer.memoryStorage() });
 
-router.post('/add', upload.array('images', 10), async (req, res) => {
+router.post('/add', auth, upload.array('images', 10), async (req, res) => {
   try {
     const { name, type, price, address, bedrooms, bathrooms, area, description, facilities, geolocation, status, phone } = req.body;
-    console.log("Received body:", req.body);
-    console.log("Received files:", req.files);
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: 'No images uploaded' });
     }
@@ -60,26 +59,25 @@ router.post('/add', upload.array('images', 10), async (req, res) => {
       facilities: facilities ? JSON.parse(facilities) : [],
       geolocation,
       status: status || 'available',
+      approvalStatus: 'pending',
       phone,
     };
     const property = new Property(propertyData);
     await property.save();
-    console.log("Saved property:", property);
-    res.status(201).json({ message: 'Property added', propertyId: property._id });
+    res.status(201).json({ message: 'Property added, pending approval', propertyId: property._id });
   } catch (error) {
     console.error("Error in /add:", error);
     res.status(400).json({ message: error.message });
   }
 });
 
-router.put('/:id', upload.array('images', 10), async (req, res) => {
+router.put('/:id', auth, upload.array('images', 10), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, type, price, address, bedrooms, bathrooms, area, description, facilities, geolocation, status, phone } = req.body;
     const property = await Property.findById(id);
     if (!property) return res.status(404).json({ message: 'Property not found' });
 
-    // Handle image updates
     let images = property.images || [];
     if (req.files && req.files.length > 0) {
       const baseUrl = 'https://liasion.s3.eu-north-1.amazonaws.com/';
@@ -103,10 +101,9 @@ router.put('/:id', upload.array('images', 10), async (req, res) => {
         await parallelUploads3.done();
         return `${baseUrl}${key}`;
       }));
-      images = [...images, ...newImages]; // Append new images, or replace if you want to overwrite
+      images = [...images, ...newImages];
     }
 
-    // Update property data
     property.name = name || property.name;
     property.type = type || property.type;
     property.price = price ? parseFloat(price) : property.price;
@@ -119,22 +116,42 @@ router.put('/:id', upload.array('images', 10), async (req, res) => {
     property.facilities = facilities ? JSON.parse(facilities) : property.facilities;
     property.geolocation = geolocation || property.geolocation;
     property.status = status || property.status;
+    property.approvalStatus = 'pending';
     property.phone = phone || property.phone;
 
     await property.save();
-    console.log("Updated property:", property);
-    res.json({ message: 'Property updated', propertyId: property._id });
+    res.json({ message: 'Property updated, pending approval', propertyId: property._id });
   } catch (error) {
     console.error("Error in /put:", error);
     res.status(400).json({ message: error.message });
   }
 });
 
-router.put('/:propertyId/status', async (req, res) => {
+router.put('/:id/approve', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Only superadmin can approve properties' });
+    }
+    const { id } = req.params;
+    const { approvalStatus } = req.body;
+    if (!['approved', 'rejected'].includes(approvalStatus)) {
+      return res.status(400).json({ message: 'Invalid approval status' });
+    }
+    const property = await Property.findById(id);
+    if (!property) return res.status(404).json({ message: 'Property not found' });
+    
+    property.approvalStatus = approvalStatus;
+    await property.save();
+    res.json({ message: `Property ${approvalStatus}`, propertyId: property._id });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.put('/:propertyId/status', auth, async (req, res) => {
   try {
     const { propertyId } = req.params;
     const { status } = req.body;
-    console.log("Received status update request for propertyId:", propertyId, "with status:", status); // Debug log
 
     if (!status) {
       return res.status(400).json({ message: 'Status is required' });
@@ -145,9 +162,12 @@ router.put('/:propertyId/status', async (req, res) => {
       return res.status(404).json({ message: 'Property not found' });
     }
 
+    if (property.approvalStatus !== 'approved' && req.user.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Property must be approved by superadmin first' });
+    }
+
     property.status = status;
     await property.save();
-    console.log("Updated property status:", property);
     res.json({ message: 'Property status updated', propertyId: property._id, status: property.status });
   } catch (error) {
     console.error("Error in /status:", error);
@@ -155,9 +175,21 @@ router.put('/:propertyId/status', async (req, res) => {
   }
 });
 
+router.get('/pending', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Only superadmin can view pending properties' });
+    }
+    const properties = await Property.find({ approvalStatus: 'pending' }).sort({ createdAt: -1 });
+    res.json(properties);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
 router.get('/latest', async (req, res) => {
   try {
-    const properties = await Property.find().sort({ createdAt: -1 }).limit(5);
+    const properties = await Property.find({ approvalStatus: 'approved' }).sort({ createdAt: -1 }).limit(5);
     res.json(properties);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -167,16 +199,13 @@ router.get('/latest', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { filter, query, limit } = req.query;
-    let queryObj = {};
-
-    console.log("Received query params:", { filter, query, limit }); // Debug log
+    let queryObj = { approvalStatus: 'approved' };
 
     if (query) {
       queryObj.$or = [
         { name: { $regex: new RegExp(query, 'i') } },
         { description: { $regex: new RegExp(query, 'i') } },
       ];
-      console.log("Constructed queryObj:", queryObj); // Debug log
     }
     if (filter && filter !== 'All') {
       queryObj.type = filter;
@@ -185,7 +214,6 @@ router.get('/', async (req, res) => {
     const properties = await Property.find(queryObj)
       .limit(parseInt(limit) || 6)
       .sort({ createdAt: -1 });
-    console.log("Found properties:", properties); // Debug log
     res.json(properties);
   } catch (error) {
     console.error("Backend error:", error.message);
@@ -197,6 +225,9 @@ router.get('/:id', async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
     if (!property) return res.status(404).json({ message: 'Property not found' });
+    if (property.approvalStatus !== 'approved' && req.user?.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Property not approved' });
+    }
     res.json(property);
   } catch (error) {
     res.status(400).json({ message: error.message });

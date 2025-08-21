@@ -4,7 +4,7 @@ const propertySchema = new mongoose.Schema({
   name: { type: String, required: true },
   type: { type: String, required: true },
   price: { type: Number, required: true },
-  images: [{ type: String, required: true }], // Array for multiple images
+  images: [{ type: String, required: true }],
   address: { type: String, required: true },
   bedrooms: { type: Number, required: true },
   bathrooms: { type: Number, required: true },
@@ -13,6 +13,7 @@ const propertySchema = new mongoose.Schema({
   facilities: [{ type: String }],
   geolocation: { type: String, required: true },
   status: { type: String, enum: ['available', 'booked'], default: 'available' },
+  approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   rating: { type: Number, default: 0 },
   reviews: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Review' }],
   gallery: [{ type: String }],

@@ -70,7 +70,7 @@ const SignIn = () => {
         
         if (result) {
           await refetchUser();
-          Alert.alert("Success", `Registration successful as ${isAdminRegister ? 'admin' : 'user'}`);
+          Alert.alert("Success", `Registration successful as ${isAdminRegister ? 'landlord' : 'user'}`);
           setIsRegister(false);
         } else {
           Alert.alert("Error", "Registration failed. Please try again.");

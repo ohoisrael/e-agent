@@ -6,8 +6,8 @@ import { router } from "expo-router";
 import { useGlobalContext } from "./global-provider";
 
 export const config = {
-  endpoint: "https://e-agent-backend.onrender.com/api",
-  socketEndpoint: "https://e-agent-backend.onrender.com",
+  endpoint: "http://172.20.10.2:5000/api",
+  socketEndpoint: "http://172.20.10.2:5000",
   databaseId: "propertyApp",
   propertiesCollectionId: "properties",
   bookingsCollectionId: "bookings",
@@ -34,11 +34,9 @@ export async function getCurrentUser() {
     });
     if (!response.ok) {
       const errorText = await response.text();
-
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const user = await response.json();
-
     return user;
   } catch (error) {
     console.error("Failed to fetch current user:", error);
@@ -66,7 +64,7 @@ export async function login({
     } else {
       throw new Error(data.message || "Login failed");
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Login failed:", error);
     throw error;
   }
@@ -80,7 +78,6 @@ export async function loginWithPhone(phone: string) {
       body: JSON.stringify({ phone }),
     });
     const data = await response.json();
-    console.log("loginWithPhone - Response:", data);
     if (response.ok && data.userId && data.token) {
       await AsyncStorage.setItem("token", data.token);
       return { userId: data.userId, token: data.token };
@@ -108,7 +105,6 @@ export async function register({
       body: JSON.stringify({ email, password, name }),
     });
     const data = await response.json();
-    console.log("register - Response:", data);
     if (response.ok && data.token) {
       await AsyncStorage.setItem("token", data.token);
       return true;
@@ -134,7 +130,6 @@ export async function registerWithPhone({
       body: JSON.stringify({ phone, name }),
     });
     const data = await response.json();
-    console.log("registerWithPhone - Response:", data);
     if (response.ok && data.userId && data.token) {
       await AsyncStorage.setItem("token", data.token);
       return { userId: data.userId, token: data.token };
@@ -154,7 +149,6 @@ export async function verifyPhoneToken(userId: string, otp: string) {
       body: JSON.stringify({ userId, otp }),
     });
     const data = await response.json();
-    console.log("verifyPhoneToken - Response:", data);
     return response.ok && data.token;
   } catch (error) {
     console.error("OTP verification failed:", error);
@@ -167,19 +161,58 @@ export async function getLatestProperties() {
     const response = await fetch(`${config.endpoint}/property/latest`);
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(
-        "getLatestProperties - HTTP error:",
-        response.status,
-        errorText
-      );
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const properties = await response.json();
-    console.log("getLatestProperties - Response:", properties);
     return properties;
   } catch (error) {
     console.error("Failed to fetch latest properties:", error);
     return [];
+  }
+}
+
+export async function getPendingProperties() {
+  try {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) throw new Error("No authentication token found");
+    const response = await fetch(`${config.endpoint}/property/pending`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const properties = await response.json();
+    return properties;
+  } catch (error) {
+    console.error("Failed to fetch pending properties:", error);
+    return [];
+  }
+}
+
+export async function approveProperty(propertyId: string, approvalStatus: 'approved' | 'rejected') {
+  try {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) throw new Error("No authentication token found");
+    const response = await fetch(`${config.endpoint}/property/${propertyId}/approve`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ approvalStatus }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error("Failed to approve/reject property:", error);
+    throw error;
   }
 }
 
@@ -198,19 +231,14 @@ export async function getProperties({
     url.searchParams.append("limit", (limit || 6).toString());
     if (query && query.trim()) {
       url.searchParams.append("query", query.trim());
-      console.log("Sending query to backend:", query);
-    } else {
-      console.log("No query provided, skipping query parameter");
     }
 
     const response = await fetch(url.toString());
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("getProperties - HTTP error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const properties = await response.json();
-    console.log("getProperties - Response:", properties);
     return properties;
   } catch (error) {
     console.error("Failed to fetch properties:", error);
@@ -227,15 +255,9 @@ export async function getPropertyById({ id }: { id: string }) {
     const response = await fetch(`${config.endpoint}/property/${id}`);
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(
-        "getPropertyById - HTTP error:",
-        response.status,
-        errorText
-      );
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const property = await response.json();
-
     return property;
   } catch (error) {
     console.error("Failed to fetch property:", error);
@@ -264,22 +286,19 @@ export async function createProperty(
         formData.append(key, data[key]);
       }
     });
-    console.log(
-      "createProperty: FormData being sent:",
-      Object.fromEntries(formData)
-    );
+    const token = await AsyncStorage.getItem("token");
     const response = await fetch(`${config.endpoint}/property/add`, {
       method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
       body: formData,
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("createProperty: HTTP error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const result = await response.json();
-    console.log("createProperty: Response:", result);
-    console.log("createProperty: Calling triggerPropertyRefresh");
     triggerPropertyRefresh();
     return result;
   } catch (error) {
@@ -306,21 +325,19 @@ export async function updateProperty(propertyId: string, data: any) {
         formData.append(key, data[key]);
       }
     });
-    console.log(
-      "FormData being sent for update:",
-      Object.fromEntries(formData)
-    );
+    const token = await AsyncStorage.getItem("token");
     const response = await fetch(`${config.endpoint}/property/${propertyId}`, {
       method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
       body: formData,
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("updateProperty - HTTP error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const result = await response.json();
-    console.log("updateProperty - Response:", result);
     return result;
   } catch (error) {
     console.error("Update property failed:", error);
@@ -351,11 +368,9 @@ export async function createBooking({
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("createBooking - HTTP error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const result = await response.json();
-    console.log("createBooking - Response:", result);
     return result;
   } catch (error) {
     console.error("Failed to create booking:", error);
@@ -371,7 +386,6 @@ export async function getBookings({ userId }: { userId?: string }) {
     const user = await getCurrentUser();
     if (!user) throw new Error("User not found");
 
-    // Always use the current user's ID unless specifically requesting another user's bookings (admin)
     const effectiveUserId = userId || user._id || user.$id;
     const endpoint =
       user?.role === "admin" && !userId
@@ -402,7 +416,7 @@ export async function getPayments({ userId }: { userId?: string }) {
   try {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
-    const user = await getCurrentUser(); // Assuming getCurrentUser is implemented
+    const user = await getCurrentUser();
     const endpoint =
       user?.role === "admin"
         ? "/payment/admin"
@@ -417,13 +431,11 @@ export async function getPayments({ userId }: { userId?: string }) {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("getPayments - HTTP error:", response.status, errorText);
       throw new Error(
         `HTTP error! status: ${response.status}, message: ${errorText}`
       );
     }
     const payments = await response.json();
-    console.log("getPayments - Response:", payments);
     return payments;
   } catch (error) {
     console.error("Failed to fetch payments:", error);
@@ -442,7 +454,6 @@ export async function createPayment(data: {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
     router.push("/sign-in");
-    console.log("Token used for payment:", token);
     const response = await fetch(`${config.endpoint}/payment/initialize`, {
       method: "POST",
       headers: {
@@ -453,29 +464,21 @@ export async function createPayment(data: {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Payment initialization failed - Raw response:", errorText);
       throw new Error(
         `HTTP error! status: ${response.status}, message: ${errorText}`
       );
     }
     const result = await response.json();
-    console.log("Payment initialization response:", result);
     if (result.authorization_url) {
       const redirectResult = await WebBrowser.openAuthSessionAsync(
         result.authorization_url,
         `${config.endpoint}/payment/verify/${result.reference}`
       );
-      console.log("Redirect Result in createPayment:", redirectResult);
       if (redirectResult.type === "success") {
         const verification = await verifyPayment(result.reference);
-        console.log("Verification Result in createPayment:", verification);
         return verification;
       } else if (redirectResult.type === "cancel") {
         const verification = await verifyPayment(result.reference);
-        console.log(
-          "Cancellation Verification in createPayment:",
-          verification
-        );
         return verification;
       } else {
         throw new Error("Redirect process interrupted");
@@ -492,7 +495,6 @@ export async function verifyPayment(reference: string) {
   try {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
-    console.log("Token used for verification:", token);
     const response = await fetch(
       `${config.endpoint}/payment/verify/${reference}`,
       {
@@ -505,13 +507,11 @@ export async function verifyPayment(reference: string) {
     );
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Payment verification failed - Raw response:", errorText);
       throw new Error(
         `HTTP error! status: ${response.status}, message: ${errorText}`
       );
     }
     const result = await response.json();
-    console.log("Payment verification response:", result);
     if (result.status === "success") {
       await updatePropertyStatus(result.payment.propertyId, "booked");
     }
@@ -539,15 +539,9 @@ export async function updatePropertyStatus(propertyId: string, status: string) {
     );
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(
-        "updatePropertyStatus - HTTP error:",
-        response.status,
-        errorText
-      );
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const result = await response.json();
-    console.log("updatePropertyStatus - Response:", result);
     return result;
   } catch (error) {
     console.error("Failed to update property status:", error);
@@ -591,11 +585,9 @@ export async function startChat({
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("startChat - HTTP error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const result = await response.json();
-    console.log("startChat - Response:", result);
     return result;
   } catch (error) {
     console.error("Failed to start chat:", error);
@@ -613,7 +605,6 @@ export async function sendMessage({
   senderName: string;
 }) {
   try {
-    console.log("Sending message to server:", { chatId, content, senderName });
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
     const response = await fetch(`${config.endpoint}/chat/send`, {
@@ -630,11 +621,9 @@ export async function sendMessage({
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("sendMessage - HTTP error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const result = await response.json();
-    console.log("sendMessage - Response:", result);
     return result;
   } catch (error) {
     console.error("Failed to send message:", error);
@@ -655,11 +644,9 @@ export async function getMessages(chatId: string) {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("getMessages - HTTP error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const chat = await response.json();
-    console.log("getMessages - Response:", chat);
     return chat;
   } catch (error) {
     console.error("Failed to fetch messages:", error);
@@ -671,7 +658,6 @@ export async function getAdminChats() {
   try {
     const token = await AsyncStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
-    console.log("Token for admin chats:", token);
     const response = await fetch(`${config.endpoint}/chat/admin/chats`, {
       method: "GET",
       headers: {
@@ -681,11 +667,9 @@ export async function getAdminChats() {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("getAdminChats - HTTP error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const chats = await response.json();
-    console.log("getAdminChats - Response:", chats);
     return chats;
   } catch (error) {
     console.error("Failed to fetch admin chats:", error);
@@ -709,7 +693,6 @@ export async function registerAdmin({
       body: JSON.stringify({ email, password, name }),
     });
     const data = await response.json();
-    console.log("registerAdmin - Response:", data);
     if (response.ok && data.token) {
       await AsyncStorage.setItem("token", data.token);
       return true;
@@ -729,16 +712,12 @@ export async function registerAdminWithPhone({
   name: string;
 }) {
   try {
-    const response = await fetch(
-      `${config.endpoint}/auth/register/phone/admin`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, name }),
-      }
-    );
+    const response = await fetch(`${config.endpoint}/auth/register/phone/admin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, name }),
+    });
     const data = await response.json();
-    console.log("registerAdminWithPhone - Response:", data);
     if (response.ok && data.userId && data.token) {
       await AsyncStorage.setItem("token", data.token);
       return { userId: data.userId, token: data.token };

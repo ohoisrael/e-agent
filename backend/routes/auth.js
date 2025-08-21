@@ -50,7 +50,7 @@ router.post('/login/phone', async (req, res) => {
     const otpDoc = new OTP({ userId: user._id, otp, expireIn, status: 'pending' });
     await otpDoc.save();
 
-    await sms.sendOTP(phone, otp); // Use phone as provided (e.g., 0201818192)
+    await sms.sendOTP(phone, otp);
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
     res.json({ userId: user._id, token });
@@ -75,7 +75,7 @@ router.post('/register/phone', async (req, res) => {
     const otpDoc = new OTP({ userId: newUser._id, otp, expireIn, status: 'pending' });
     await otpDoc.save();
 
-    await sms.sendOTP(phone, otp); // Use phone as provided (e.g., 0201818192)
+    await sms.sendOTP(phone, otp);
 
     const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET);
     res.json({ userId: newUser._id, token });
@@ -124,7 +124,7 @@ router.post('/register/admin', async (req, res) => {
       email, 
       password: hashedPassword, 
       phone, 
-      role: 'admin' // Explicitly set role to admin
+      role: 'admin'
     });
     await user.save();
     const token = jwt.sign({ id: user._id, role: user.role, email: user.email }, process.env.JWT_SECRET);
@@ -145,7 +145,7 @@ router.post('/register/phone/admin', async (req, res) => {
     const newUser = new User({ 
       phone, 
       name, 
-      role: 'admin', // Explicitly set role to admin
+      role: 'admin',
       status: 'pending' 
     });
     await newUser.save();
